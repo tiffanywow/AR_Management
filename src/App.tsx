@@ -30,6 +30,7 @@ import PartyManagement from '@/pages/PartyManagement';
 import Store from '@/pages/Store';
 import RegionalAuthority from '@/pages/RegionalAuthority';
 import NotificationTest from '@/pages/NotificationTest';
+import DatabaseDiagnostic from '@/pages/DatabaseDiagnostic';
 import './App.css';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -89,6 +90,7 @@ function AppRoutes() {
         <Route path="store" element={<Store />} />
         <Route path="regional-authority" element={<RegionalAuthority />} />
         <Route path="notification-test" element={<NotificationTest />} />
+        <Route path="database-diagnostic" element={<DatabaseDiagnostic />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>
