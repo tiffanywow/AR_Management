@@ -66,13 +66,13 @@ export default function Signup() {
         console.log('User created:', data.user.id);
 
         toast({
-          title: 'Account Created',
-          description: 'Your account has been created successfully. You can now log in.',
+          title: 'Account Created Successfully',
+          description: 'Redirecting to dashboard...',
         });
 
         setTimeout(() => {
-          navigate('/login');
-        }, 1000);
+          navigate('/dashboard');
+        }, 1500);
       } else {
         throw new Error('No user data returned from signup');
       }
