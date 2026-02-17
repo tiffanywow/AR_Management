@@ -164,7 +164,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
       notificationChannel.unsubscribe();
       supabase.removeChannel(notificationChannel);
     };
-  }, [profile?.id]);
+  }, [profile?.id, fetchNotifications, showPopup]);
 
   return (
     <NotificationContext.Provider
