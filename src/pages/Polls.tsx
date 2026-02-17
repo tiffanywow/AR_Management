@@ -483,7 +483,10 @@ export default function Polls() {
                               });
                             }
                           }}
-                          className="rounded border-gray-300"
+                          className="rounded bg-white border-gray-300 text-[#d1242a] focus:ring-[#d1242a] focus:ring-offset-0 w-4 h-4"
+                          style={{
+                            accentColor: '#d1242a'
+                          }}
                         />
                         <span className="font-light">{community.name}</span>
                       </label>
