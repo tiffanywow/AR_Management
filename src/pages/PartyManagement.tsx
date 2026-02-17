@@ -890,26 +890,28 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leader
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
-    if (item) {
-      setFormData(item);
-    } else {
-      setFormData({
-        icon: '⭐',
-        title: '',
-        description: '',
-        name: '',
-        position: '',
-        region: '',
-        level: leaderLevel || 'national',
-        text: '',
-        label: '',
-        value: '',
-        url: '',
-        sort_order: 1,
-        is_active: true,
-      });
+    if (open) {
+      if (item) {
+        setFormData(item);
+      } else {
+        setFormData({
+          icon: '⭐',
+          title: '',
+          description: '',
+          name: '',
+          position: '',
+          region: '',
+          level: leaderLevel || 'national',
+          text: '',
+          label: '',
+          value: '',
+          url: '',
+          sort_order: 1,
+          is_active: true,
+        });
+      }
     }
-  }, [item, section, leaderLevel]);
+  }, [open, item, section, leaderLevel]);
 
   const handleSubmit = () => {
     onSave(formData);
