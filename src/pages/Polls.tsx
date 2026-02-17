@@ -566,7 +566,7 @@ export default function Polls() {
                         }}
                         modifiersClassNames={{
                           inRange: 'bg-[#fecaca] !border-transparent',
-                          rangeEdge: '!border-transparent',
+                          rangeEdge: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white !border-transparent',
                         }}
                         classNames={{
                           day: cn(
