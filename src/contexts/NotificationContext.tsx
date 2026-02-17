@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
-import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface Notification {
   id: string;
@@ -47,7 +46,6 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!profile?.id) return;
@@ -162,14 +160,11 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
       )
       .subscribe();
 
-    setChannel(notificationChannel);
-
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      notificationChannel.unsubscribe();
+      supabase.removeChannel(notificationChannel);
     };
-  }, [profile?.id, showPopup]);
+  }, [profile?.id]);
 
   return (
     <NotificationContext.Provider
