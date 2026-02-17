@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -542,6 +542,31 @@ export default function Polls() {
                         onSelect={setCustomEndDate}
                         disabled={(date) => date < new Date()}
                         initialFocus
+                        modifiers={{
+                          inRange: (date) => {
+                            if (!customEndDate) return false;
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const checkDate = new Date(date);
+                            checkDate.setHours(0, 0, 0, 0);
+                            const endDate = new Date(customEndDate);
+                            endDate.setHours(0, 0, 0, 0);
+                            return checkDate > today && checkDate < endDate;
+                          },
+                        }}
+                        modifiersClassNames={{
+                          inRange: 'bg-red-50 border-red-200',
+                        }}
+                        classNames={{
+                          day: cn(
+                            buttonVariants({ variant: 'ghost' }),
+                            'h-8 w-8 p-0 font-normal border border-gray-400 hover:border-gray-600 hover:bg-gray-50'
+                          ),
+                          day_today: 'border-2 border-[#d1242a] bg-transparent text-gray-900 font-semibold hover:bg-red-50',
+                          day_selected: 'border-2 border-[#d1242a] bg-[#d1242a] text-white hover:bg-[#b91c1c] hover:text-white focus:bg-[#d1242a] focus:text-white',
+                          day_disabled: 'border border-gray-300 text-gray-400 opacity-50 cursor-not-allowed hover:bg-transparent',
+                          day_outside: 'text-gray-300 opacity-30 border-transparent',
+                        }}
                       />
                     </PopoverContent>
                   </Popover>
