@@ -562,14 +562,14 @@ export default function Polls() {
                         classNames={{
                           day: cn(
                             buttonVariants({ variant: 'ghost' }),
-                            'h-8 w-8 p-0 font-normal bg-white hover:bg-white',
+                            'h-8 w-8 p-0 font-normal',
                             customEndDate ? 'border-transparent' : 'border border-gray-400 hover:border-gray-600'
                           ),
                           day_today: cn(
-                            'bg-[#d1242a] text-white font-semibold hover:bg-[#b91c1c] border-transparent',
-                            customEndDate && 'border-transparent'
+                            '!bg-[#d1242a] !text-white font-semibold hover:!bg-[#b91c1c] !border-transparent',
+                            customEndDate && '!border-transparent'
                           ),
-                          day_selected: 'bg-[#d1242a] text-white hover:bg-[#b91c1c] hover:text-white focus:bg-[#d1242a] focus:text-white border-transparent',
+                          day_selected: '!bg-[#d1242a] !text-white hover:!bg-[#b91c1c] hover:!text-white focus:!bg-[#d1242a] focus:!text-white !border-transparent',
                           day_disabled: cn(
                             'bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white',
                             customEndDate ? 'border-transparent' : 'border border-gray-300'
