@@ -95,6 +95,8 @@ export default function PartyManagement() {
   const [currentLeaderLevel, setCurrentLeaderLevel] = useState<'national' | 'regional' | 'district' | 'community'>('national');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; table: string; level?: string } | null>(null);
+  const [sortOrderConflictDialog, setSortOrderConflictDialog] = useState(false);
+  const [pendingSaveData, setPendingSaveData] = useState<{ formData: any; table: string; dataToSave: any } | null>(null);
 
   useEffect(() => {
     fetchAllData();
@@ -267,6 +269,39 @@ export default function PartyManagement() {
         };
       }
 
+      let query = supabase
+        .from(table)
+        .select('id, sort_order')
+        .eq('sort_order', formData.sort_order);
+
+      if (currentSection === 'leadership') {
+        query = query.eq('level', formData.level);
+      }
+
+      if (editingItem) {
+        query = query.neq('id', editingItem.id);
+      }
+
+      const { data: conflictingItems, error: conflictError } = await query;
+
+      if (conflictError) throw conflictError;
+
+      if (conflictingItems && conflictingItems.length > 0) {
+        setPendingSaveData({ formData, table, dataToSave });
+        setSortOrderConflictDialog(true);
+        setLoading(false);
+        return;
+      }
+
+      await performSave(table, dataToSave);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setLoading(false);
+    }
+  };
+
+  const performSave = async (table: string, dataToSave: any) => {
+    try {
       if (editingItem) {
         const { error } = await supabase
           .from(table)
@@ -287,6 +322,53 @@ export default function PartyManagement() {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmSortOrderOverwrite = async () => {
+    if (!pendingSaveData) return;
+
+    setLoading(true);
+    setSortOrderConflictDialog(false);
+
+    try {
+      const { table, dataToSave, formData } = pendingSaveData;
+
+      let shiftQuery = supabase
+        .from(table)
+        .select('id, sort_order');
+
+      if (currentSection === 'leadership') {
+        shiftQuery = shiftQuery.eq('level', formData.level);
+      }
+
+      shiftQuery = shiftQuery.gte('sort_order', formData.sort_order);
+
+      if (editingItem) {
+        shiftQuery = shiftQuery.neq('id', editingItem.id);
+      }
+
+      const { data: itemsToShift, error: fetchError } = await shiftQuery.order('sort_order', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      if (itemsToShift && itemsToShift.length > 0) {
+        for (const item of itemsToShift) {
+          const { error: updateError } = await supabase
+            .from(table)
+            .update({ sort_order: item.sort_order + 1 })
+            .eq('id', item.id);
+
+          if (updateError) throw updateError;
+        }
+      }
+
+      await performSave(table, dataToSave);
+      setPendingSaveData(null);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setLoading(false);
+      setPendingSaveData(null);
     }
   };
 
@@ -878,6 +960,26 @@ export default function PartyManagement() {
             <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete} className="bg-[#d1242a] hover:bg-[#b91c1c]">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={sortOrderConflictDialog} onOpenChange={setSortOrderConflictDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sort Order Already Exists</AlertDialogTitle>
+            <AlertDialogDescription>
+              Another item already has this sort order number. Do you want to overwrite it? The existing item will be moved down to the next position, and all subsequent items will be shifted accordingly.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setPendingSaveData(null);
+              setSortOrderConflictDialog(false);
+            }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSortOrderOverwrite} className="bg-[#d1242a] hover:bg-[#b91c1c]">
+              Yes, Overwrite
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
