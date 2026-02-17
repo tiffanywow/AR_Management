@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Save, Building2, Target, Award, Users, Phone, Mail, Globe, MapPin, Map, Edit2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, Building2, Target, Award, Users, Phone, Mail, Globe, MapPin, Map, Edit2, X, GripVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,6 +43,7 @@ interface Leader {
   name: string;
   position: string;
   region: string;
+  level: 'national' | 'regional' | 'district' | 'community';
   sort_order: number;
   is_active: boolean;
 }
@@ -89,6 +90,8 @@ export default function PartyManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentSection, setCurrentSection] = useState<'values' | 'leadership' | 'achievements' | 'contacts'>('values');
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [draggedLeader, setDraggedLeader] = useState<Leader | null>(null);
+  const [currentLeaderLevel, setCurrentLeaderLevel] = useState<'national' | 'regional' | 'district' | 'community'>('national');
 
   useEffect(() => {
     fetchAllData();
@@ -210,9 +213,10 @@ export default function PartyManagement() {
     }
   };
 
-  const handleOpenDialog = (section: 'values' | 'leadership' | 'achievements' | 'contacts', item?: any) => {
+  const handleOpenDialog = (section: 'values' | 'leadership' | 'achievements' | 'contacts', item?: any, level?: 'national' | 'regional' | 'district' | 'community') => {
     setCurrentSection(section);
     setEditingItem(item || null);
+    if (level) setCurrentLeaderLevel(level);
     setDialogOpen(true);
   };
 
@@ -315,6 +319,55 @@ export default function PartyManagement() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDragStart = (leader: Leader) => {
+    setDraggedLeader(leader);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (targetLeader: Leader) => {
+    if (!draggedLeader || draggedLeader.id === targetLeader.id || draggedLeader.level !== targetLeader.level) {
+      setDraggedLeader(null);
+      return;
+    }
+
+    const levelLeaders = leadership.filter(l => l.level === targetLeader.level);
+    const draggedIndex = levelLeaders.findIndex(l => l.id === draggedLeader.id);
+    const targetIndex = levelLeaders.findIndex(l => l.id === targetLeader.id);
+
+    const reordered = [...levelLeaders];
+    const [removed] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, removed);
+
+    const updates = reordered.map((leader, index) => ({
+      id: leader.id,
+      sort_order: index
+    }));
+
+    try {
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('about_leadership')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+        if (error) throw error;
+      }
+
+      toast({ title: 'Success', description: 'Leadership order updated' });
+      fetchLeadership();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+
+    setDraggedLeader(null);
+  };
+
+  const getLeadersByLevel = (level: string) => {
+    return leadership.filter(l => l.level === level).sort((a, b) => a.sort_order - b.sort_order);
   };
 
   return (
@@ -468,44 +521,72 @@ export default function PartyManagement() {
         </TabsContent>
 
         <TabsContent value="leadership" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-[#d1242a]" />
-                    Leadership Team
-                  </CardTitle>
-                  <CardDescription>Organization leaders and their roles</CardDescription>
-                </div>
-                <Button onClick={() => handleOpenDialog('leadership')} className="bg-[#d1242a] hover:bg-[#b91c1c]">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Leader
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {leadership.map((leader) => (
-                  <div key={leader.id} className="flex items-center justify-between p-4 border rounded-lg">
+          {(['national', 'regional', 'district', 'community'] as const).map((level) => {
+            const leaders = getLeadersByLevel(level);
+            const levelTitle = level.charAt(0).toUpperCase() + level.slice(1);
+
+            return (
+              <Card key={level}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-medium">{leader.name}</h3>
-                      <p className="text-sm text-gray-600">{leader.position}</p>
-                      <p className="text-xs text-gray-500">{leader.region}</p>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-[#d1242a]" />
+                        {levelTitle} Leadership
+                      </CardTitle>
+                      <CardDescription>{levelTitle} level leaders and their roles</CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('leadership', leader)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(leader.id, 'about_leadership')}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button onClick={() => handleOpenDialog('leadership', null, level)} className="bg-[#d1242a] hover:bg-[#b91c1c]">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Leader
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </CardHeader>
+                <CardContent>
+                  {leaders.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      No {level} leaders added yet
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {leaders.map((leader) => (
+                        <div
+                          key={leader.id}
+                          draggable
+                          onDragStart={() => handleDragStart(leader)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(leader)}
+                          className={`flex items-center justify-between p-4 border rounded-lg cursor-move hover:bg-gray-50 transition-colors ${
+                            draggedLeader?.id === leader.id ? 'opacity-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            <GripVertical className="h-5 w-5 text-gray-400" />
+                            <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded text-gray-500 text-sm font-medium">
+                              {leader.sort_order + 1}
+                            </div>
+                            <div>
+                              <h3 className="font-medium">{leader.name}</h3>
+                              <p className="text-sm text-gray-600">{leader.position}</p>
+                              <p className="text-xs text-gray-500">{leader.region}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('leadership', leader, level)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(leader.id, 'about_leadership')}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </TabsContent>
 
         <TabsContent value="achievements" className="space-y-6">
@@ -713,12 +794,13 @@ export default function PartyManagement() {
         item={editingItem}
         onSave={handleSaveItem}
         loading={loading}
+        leaderLevel={currentLeaderLevel}
       />
     </div>
   );
 }
 
-function ItemDialog({ open, onOpenChange, section, item, onSave, loading }: any) {
+function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leaderLevel }: any) {
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
@@ -732,6 +814,7 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading }: any)
         name: '',
         position: '',
         region: '',
+        level: leaderLevel || 'national',
         text: '',
         label: '',
         value: '',
@@ -740,7 +823,7 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading }: any)
         is_active: true,
       });
     }
-  }, [item, section]);
+  }, [item, section, leaderLevel]);
 
   const handleSubmit = () => {
     onSave(formData);
@@ -783,6 +866,14 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading }: any)
 
           {section === 'leadership' && (
             <>
+              <div className="space-y-2">
+                <Label>Level</Label>
+                <Input
+                  value={(formData.level || leaderLevel || 'national').charAt(0).toUpperCase() + (formData.level || leaderLevel || 'national').slice(1)}
+                  disabled
+                  className="bg-gray-50"
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input
