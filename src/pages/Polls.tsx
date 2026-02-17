@@ -417,7 +417,7 @@ export default function Polls() {
               Create Poll
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>{editingPollId ? 'Edit Poll' : 'Create New Poll'}</DialogTitle>
               <DialogDescription>
@@ -427,7 +427,7 @@ export default function Polls() {
                 }
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-6">
+            <div className="space-y-6 overflow-y-auto pr-2">
               <div className="space-y-2">
                 <Label>Question</Label>
                 <Input
