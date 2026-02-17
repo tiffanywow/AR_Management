@@ -553,27 +553,29 @@ export default function Polls() {
                             endDate.setHours(0, 0, 0, 0);
                             return checkDate > today && checkDate < endDate;
                           },
-                          noBorder: () => !!customEndDate,
+                          rangeEdge: (date) => {
+                            if (!customEndDate) return false;
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const checkDate = new Date(date);
+                            checkDate.setHours(0, 0, 0, 0);
+                            const endDate = new Date(customEndDate);
+                            endDate.setHours(0, 0, 0, 0);
+                            return checkDate.getTime() === today.getTime() || checkDate.getTime() === endDate.getTime();
+                          },
                         }}
                         modifiersClassNames={{
                           inRange: 'bg-[#fecaca] border-transparent',
-                          noBorder: 'border-transparent',
+                          rangeEdge: 'border-transparent',
                         }}
                         classNames={{
                           day: cn(
                             buttonVariants({ variant: 'ghost' }),
-                            'h-8 w-8 p-0 font-normal bg-white hover:bg-white',
-                            customEndDate ? 'border-transparent' : 'border border-gray-400 hover:border-gray-600'
+                            'h-8 w-8 p-0 font-normal bg-white hover:bg-white border border-gray-400 hover:border-gray-600'
                           ),
-                          day_today: cn(
-                            'bg-[#d1242a] text-white font-semibold hover:bg-[#b91c1c] border-transparent',
-                            customEndDate && 'border-transparent'
-                          ),
+                          day_today: 'bg-[#d1242a] text-white font-semibold hover:bg-[#b91c1c] border-transparent',
                           day_selected: 'bg-[#d1242a] text-white hover:bg-[#b91c1c] hover:text-white focus:bg-[#d1242a] focus:text-white border-transparent',
-                          day_disabled: cn(
-                            'bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white',
-                            customEndDate ? 'border-transparent' : 'border border-gray-300'
-                          ),
+                          day_disabled: 'bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white border border-gray-300',
                           day_outside: 'text-gray-300 opacity-30 border-transparent bg-white',
                         }}
                       />
