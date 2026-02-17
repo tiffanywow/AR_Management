@@ -537,8 +537,7 @@ export default function Polls() {
                         variant="outline"
                         className={cn(
                           'w-full justify-start text-left font-normal',
-                          !customDateRange && 'text-gray-500',
-                          customDateRange?.from && 'bg-[#d1242a] text-white hover:bg-[#b91c1c] border-[#d1242a]'
+                          !customDateRange && 'text-gray-500'
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
