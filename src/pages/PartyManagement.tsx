@@ -224,21 +224,56 @@ export default function PartyManagement() {
     setLoading(true);
     try {
       let table = '';
-      if (currentSection === 'values') table = 'about_values';
-      else if (currentSection === 'leadership') table = 'about_leadership';
-      else if (currentSection === 'achievements') table = 'about_achievements';
-      else if (currentSection === 'contacts') table = 'about_contact';
+      let dataToSave = { ...formData };
+
+      if (currentSection === 'values') {
+        table = 'about_values';
+        dataToSave = {
+          icon: formData.icon,
+          title: formData.title,
+          description: formData.description,
+          sort_order: formData.sort_order,
+          is_active: formData.is_active
+        };
+      } else if (currentSection === 'leadership') {
+        table = 'about_leadership';
+        dataToSave = {
+          name: formData.name,
+          position: formData.position,
+          region: formData.region,
+          level: formData.level,
+          sort_order: formData.sort_order,
+          is_active: formData.is_active
+        };
+      } else if (currentSection === 'achievements') {
+        table = 'about_achievements';
+        dataToSave = {
+          text: formData.text,
+          sort_order: formData.sort_order,
+          is_active: formData.is_active
+        };
+      } else if (currentSection === 'contacts') {
+        table = 'about_contact';
+        dataToSave = {
+          icon: formData.icon,
+          label: formData.label,
+          value: formData.value,
+          url: formData.url,
+          sort_order: formData.sort_order,
+          is_active: formData.is_active
+        };
+      }
 
       if (editingItem) {
         const { error } = await supabase
           .from(table)
-          .update(formData)
+          .update(dataToSave)
           .eq('id', editingItem.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from(table)
-          .insert([formData]);
+          .insert([dataToSave]);
         if (error) throw error;
       }
 
@@ -345,7 +380,7 @@ export default function PartyManagement() {
 
     const updates = reordered.map((leader, index) => ({
       id: leader.id,
-      sort_order: index
+      sort_order: index + 1
     }));
 
     try {
@@ -819,7 +854,7 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leader
         label: '',
         value: '',
         url: '',
-        sort_order: 0,
+        sort_order: 1,
         is_active: true,
       });
     }
@@ -886,7 +921,6 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leader
                 <Input
                   value={formData.position || ''}
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  placeholder="Enter position title"
                 />
               </div>
               <div className="space-y-2">
@@ -950,8 +984,9 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leader
             <Label>Sort Order</Label>
             <Input
               type="number"
-              value={formData.sort_order || 0}
-              onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) })}
+              min="1"
+              value={formData.sort_order || 1}
+              onChange={(e) => setFormData({ ...formData, sort_order: Math.max(1, parseInt(e.target.value) || 1) })}
             />
           </div>
 
