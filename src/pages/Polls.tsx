@@ -487,22 +487,6 @@ export default function Polls() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Poll Type</Label>
-                  <Select
-                    value={formData.poll_type}
-                    onValueChange={(value) => setFormData({ ...formData, poll_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="single">Single Choice</SelectItem>
-                      <SelectItem value="multiple">Multiple Choice</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
                   <Label>Duration (when broadcast)</Label>
                   <Select
                     value={formData.duration_days}
@@ -526,18 +510,34 @@ export default function Polls() {
                     </SelectContent>
                   </Select>
                   {formData.duration_days && formData.duration_days !== 'custom' && (
-                    <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-1">
                       <div className="text-sm text-left">
                         <span className="text-gray-600 font-medium">Start Date:</span> <span className="text-gray-900">{format(new Date(), 'LLL dd, y')}</span>
-                        <span className="mx-3 text-gray-400">•</span>
+                      </div>
+                      <div className="text-sm text-left">
                         <span className="text-gray-600 font-medium">End Date:</span> <span className="text-gray-900">{format(addDays(new Date(), parseInt(formData.duration_days)), 'LLL dd, y')}</span>
-                        <span className="mx-3 text-gray-400">•</span>
-                        <span className="text-xs text-gray-500">
-                          {formData.duration_days} day{parseInt(formData.duration_days) > 1 ? 's' : ''}
-                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 text-left pt-1">
+                        {formData.duration_days} day{parseInt(formData.duration_days) > 1 ? 's' : ''}
                       </div>
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Poll Type</Label>
+                  <Select
+                    value={formData.poll_type}
+                    onValueChange={(value) => setFormData({ ...formData, poll_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Single Choice</SelectItem>
+                      <SelectItem value="multiple">Multiple Choice</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
