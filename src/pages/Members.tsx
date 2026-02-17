@@ -249,7 +249,8 @@ export default function Members() {
     const regionClass = regionClassifications.find(r => r.region_name === regionName);
 
     if (!regionClass) {
-      return '';
+      console.error('Region classification not found for:', regionName);
+      throw new Error(`Region classification not found for ${regionName}`);
     }
 
     const regionCode = regionClass.region_code;
@@ -259,6 +260,7 @@ export default function Members() {
       .select('membership_number')
       .like('membership_number', `${regionCode}-%`)
       .not('membership_number', 'is', null)
+      .neq('membership_number', '')
       .order('membership_number', { ascending: false })
       .limit(1);
 
@@ -279,8 +281,17 @@ export default function Members() {
 
   const handleRegionChange = async (region: string) => {
     setFormData({ ...formData, region });
-    const membershipNumber = await generateMembershipNumber(region);
-    setFormData(prev => ({ ...prev, region, membership_number: membershipNumber }));
+    try {
+      const membershipNumber = await generateMembershipNumber(region);
+      setFormData(prev => ({ ...prev, region, membership_number: membershipNumber }));
+    } catch (error) {
+      console.error('Error generating membership number:', error);
+      toast({
+        title: 'Warning',
+        description: 'Could not generate membership number preview. This will be generated upon approval.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleApproveMember = async (memberId: string) => {
@@ -293,10 +304,32 @@ export default function Members() {
           description: 'Member region not found',
           variant: 'destructive',
         });
+        setActionLoading(null);
+        return;
+      }
+
+      if (regionClassifications.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'Region classifications not loaded yet. Please try again.',
+          variant: 'destructive',
+        });
+        setActionLoading(null);
         return;
       }
 
       const membershipNumber = await generateMembershipNumber(member.region);
+
+      if (!membershipNumber || membershipNumber.trim() === '') {
+        toast({
+          title: 'Error',
+          description: 'Failed to generate membership number. Please try again.',
+          variant: 'destructive',
+        });
+        setActionLoading(null);
+        return;
+      }
+
       const now = new Date().toISOString();
 
       const { error: updateError } = await supabase
