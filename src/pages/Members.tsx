@@ -942,25 +942,34 @@ export default function Members() {
               )}
 
               {selectedMember.status === 'approved' && selectedMember.approved_at && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold text-green-900 mb-2">Approval Information</h4>
-                      <p className="text-sm text-green-800">
-                        Approved on {new Date(selectedMember.approved_at).toLocaleDateString()}
-                      </p>
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-green-900 mb-2">Approval Information</h4>
+                        <p className="text-sm text-green-800">
+                          Approved on {new Date(selectedMember.approved_at).toLocaleDateString()}
+                        </p>
+                        {selectedMember.membership_number && (
+                          <p className="text-sm text-green-800 mt-1">
+                            Membership Number: <span className="font-semibold">{selectedMember.membership_number}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {selectedMember.membership_number && (
+                  </div>
+
+                  {selectedMember.membership_number && (
+                    <div className="flex justify-end space-x-3 pt-4 border-t">
                       <Button
-                        variant="outline"
-                        className="text-[#d1242a] border-[#d1242a] hover:bg-[#d1242a] hover:text-white"
+                        className="bg-[#d1242a] hover:bg-[#b91c1c]"
                         onClick={handleDownloadCard}
                       >
                         <Download className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                        Download Card
+                        Download Membership Card
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
