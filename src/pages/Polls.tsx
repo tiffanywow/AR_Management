@@ -30,6 +30,7 @@ interface Poll {
   total_votes: number | null;
   total_participants: number | null;
   results: any;
+  target_communities: string[] | null;
   created_at: string;
   created_by: string | null;
 }
@@ -41,6 +42,7 @@ export default function Polls() {
   const [communities, setCommunities] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editingPollId, setEditingPollId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     question: '',
@@ -104,6 +106,31 @@ export default function Polls() {
     setOptionInputs(newOptions);
   };
 
+  const handleEditPoll = (poll: Poll) => {
+    setEditingPollId(poll.id);
+    setFormData({
+      question: poll.question,
+      description: poll.description || '',
+      poll_type: poll.poll_type || 'single',
+      duration_days: '7',
+      target_communities: Array.isArray(poll.target_communities) ? poll.target_communities : [],
+    });
+    setOptionInputs(poll.options.map(opt => opt.text));
+    setDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setEditingPollId(null);
+    setFormData({
+      question: '',
+      description: '',
+      poll_type: 'single',
+      duration_days: '7',
+      target_communities: [],
+    });
+    setOptionInputs(['', '']);
+  };
+
   const handleSavePoll = async (broadcast: boolean) => {
     console.log('handleSavePoll called with broadcast:', broadcast);
 
@@ -161,36 +188,49 @@ export default function Polls() {
         pollData.scheduled_end = endDate.toISOString();
       }
 
-      console.log('Inserting poll data:', pollData);
+      console.log('Poll data:', pollData);
 
-      const { data, error } = await supabase
-        .from('polls')
-        .insert([pollData])
-        .select();
+      let data, error;
+
+      if (editingPollId) {
+        console.log('Updating poll:', editingPollId);
+        const result = await supabase
+          .from('polls')
+          .update(pollData)
+          .eq('id', editingPollId)
+          .select();
+        data = result.data;
+        error = result.error;
+      } else {
+        console.log('Inserting new poll');
+        const result = await supabase
+          .from('polls')
+          .insert([pollData])
+          .select();
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
-        console.error('Insert error:', error);
+        console.error('Save error:', error);
         throw error;
       }
 
-      console.log('Poll inserted successfully:', data);
+      console.log('Poll saved successfully:', data);
 
       toast({
-        title: broadcast ? 'Poll Broadcasted' : 'Poll Saved as Draft',
+        title: editingPollId
+          ? (broadcast ? 'Poll Updated & Broadcasted' : 'Poll Updated')
+          : (broadcast ? 'Poll Broadcasted' : 'Poll Saved as Draft'),
         description: broadcast
           ? `Your poll is now live and will close in ${formData.duration_days} days`
+          : editingPollId
+          ? 'Your changes have been saved'
           : 'You can broadcast this poll later from the drafts section',
       });
 
       setDialogOpen(false);
-      setFormData({
-        question: '',
-        description: '',
-        poll_type: 'single',
-        duration_days: '7',
-        target_communities: [],
-      });
-      setOptionInputs(['', '']);
+      resetForm();
       fetchPolls();
     } catch (error: any) {
       console.error('handleSavePoll error:', error);
@@ -272,7 +312,10 @@ export default function Polls() {
           <h1 className="text-2xl font-semibold text-gray-900">Polls</h1>
           <p className="text-gray-600 font-light">Create polls and gather feedback from members</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}>
           <DialogTrigger asChild>
             <Button className="bg-[#d1242a] hover:bg-[#b91c1c]">
               <Plus className="mr-2 h-4 w-4" strokeWidth={1.5} />
@@ -281,8 +324,13 @@ export default function Polls() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Create New Poll</DialogTitle>
-              <DialogDescription>Ask your members a question and collect their responses</DialogDescription>
+              <DialogTitle>{editingPollId ? 'Edit Poll' : 'Create New Poll'}</DialogTitle>
+              <DialogDescription>
+                {editingPollId
+                  ? 'Update your poll question and options'
+                  : 'Ask your members a question and collect their responses'
+                }
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
               <div className="space-y-2">
@@ -428,7 +476,7 @@ export default function Polls() {
                   disabled={loading}
                 >
                   <Save className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                  {loading ? 'Saving...' : 'Save as Draft'}
+                  {loading ? 'Saving...' : editingPollId ? 'Update Draft' : 'Save as Draft'}
                 </Button>
                 <Button
                   className="flex-1 bg-[#d1242a] hover:bg-[#b91c1c]"
@@ -436,7 +484,7 @@ export default function Polls() {
                   disabled={loading}
                 >
                   <Send className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                  {loading ? 'Broadcasting...' : 'Broadcast Now'}
+                  {loading ? 'Broadcasting...' : editingPollId ? 'Update & Broadcast' : 'Broadcast Now'}
                 </Button>
               </div>
             </div>
@@ -515,14 +563,24 @@ export default function Polls() {
                       <p className="text-sm text-gray-600 font-light">{poll.description}</p>
                     )}
                   </div>
-                  <Button
-                    className="bg-[#d1242a] hover:bg-[#b91c1c]"
-                    size="sm"
-                    onClick={() => handleBroadcastDraft(poll.id)}
-                  >
-                    <Send className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                    Broadcast
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditPoll(poll)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      Edit
+                    </Button>
+                    <Button
+                      className="bg-[#d1242a] hover:bg-[#b91c1c]"
+                      size="sm"
+                      onClick={() => handleBroadcastDraft(poll.id)}
+                    >
+                      <Send className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      Broadcast
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
