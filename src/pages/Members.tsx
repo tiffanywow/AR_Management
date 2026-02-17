@@ -678,7 +678,7 @@ export default function Members() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
                         <p className="font-medium text-gray-900">{member.full_name} {member.surname}</p>
-                        {member.membership_number && (
+                        {member.membership_number && member.membership_number.trim() !== '' && (
                           <Badge variant="outline" className="text-xs">{member.membership_number}</Badge>
                         )}
                       </div>
@@ -739,7 +739,7 @@ export default function Members() {
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <span>Membership Application Details</span>
-              {selectedMember?.membership_number && (
+              {selectedMember?.membership_number && selectedMember.membership_number.trim() !== '' && (
                 <Badge variant="outline">{selectedMember.membership_number}</Badge>
               )}
             </DialogTitle>
@@ -950,7 +950,7 @@ export default function Members() {
                         <p className="text-sm text-green-800">
                           Approved on {new Date(selectedMember.approved_at).toLocaleDateString()}
                         </p>
-                        {selectedMember.membership_number && (
+                        {selectedMember.membership_number && selectedMember.membership_number.trim() !== '' && (
                           <p className="text-sm text-green-800 mt-1">
                             Membership Number: <span className="font-semibold">{selectedMember.membership_number}</span>
                           </p>
@@ -959,7 +959,7 @@ export default function Members() {
                     </div>
                   </div>
 
-                  {selectedMember.membership_number && (
+                  {selectedMember.membership_number && selectedMember.membership_number.trim() !== '' && (
                     <div className="flex justify-end space-x-3 pt-4 border-t">
                       <Button
                         className="bg-[#d1242a] hover:bg-[#b91c1c]"
