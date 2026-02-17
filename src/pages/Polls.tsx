@@ -525,6 +525,12 @@ export default function Polls() {
                       <SelectItem value="custom">Custom Date</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formData.duration_days && formData.duration_days !== 'custom' && (
+                    <div className="text-xs text-gray-500 font-light space-y-1">
+                      <p>Start Date: {format(new Date(), 'PPP')}</p>
+                      <p>End Date: {format(addDays(new Date(), parseInt(formData.duration_days)), 'PPP')}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
