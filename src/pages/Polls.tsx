@@ -8,11 +8,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, BarChart3, Clock, CheckCircle2, Users, X, Save, Send, Edit, PlayCircle } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Plus, BarChart3, Clock, CheckCircle2, Users, X, Save, Send, Edit, PlayCircle, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface PollOption {
   text: string;
@@ -56,6 +59,7 @@ export default function Polls() {
   });
 
   const [optionInputs, setOptionInputs] = useState<string[]>(['', '']);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     fetchPolls();
@@ -134,6 +138,7 @@ export default function Polls() {
       target_communities: [],
     });
     setOptionInputs(['', '']);
+    setCustomEndDate(undefined);
   };
 
   const handleSavePoll = async (broadcast: boolean) => {
@@ -212,7 +217,15 @@ export default function Polls() {
         pollData.created_by = user.id;
 
         if (broadcast) {
-          const endDate = addDays(new Date(), parseInt(formData.duration_days));
+          let endDate: Date;
+          if (formData.duration_days === 'custom') {
+            if (!customEndDate) {
+              throw new Error('Please select a custom end date');
+            }
+            endDate = customEndDate;
+          } else {
+            endDate = addDays(new Date(), parseInt(formData.duration_days));
+          }
           pollData.scheduled_start = new Date().toISOString();
           pollData.scheduled_end = endDate.toISOString();
         }
@@ -257,12 +270,16 @@ export default function Polls() {
       } else if (editingPollId) {
         toastTitle = broadcast ? 'Poll Updated & Broadcasted' : 'Poll Updated';
         toastDescription = broadcast
-          ? `Your poll is now live and will close in ${formData.duration_days} days`
+          ? formData.duration_days === 'custom' && customEndDate
+            ? `Your poll is now live and will close on ${format(customEndDate, 'PPP')}`
+            : `Your poll is now live and will close in ${formData.duration_days} days`
           : 'Your changes have been saved';
       } else {
         toastTitle = broadcast ? 'Poll Broadcasted' : 'Poll Saved as Draft';
         toastDescription = broadcast
-          ? `Your poll is now live and will close in ${formData.duration_days} days`
+          ? formData.duration_days === 'custom' && customEndDate
+            ? `Your poll is now live and will close on ${format(customEndDate, 'PPP')}`
+            : `Your poll is now live and will close in ${formData.duration_days} days`
           : 'You can broadcast this poll later from the drafts section';
       }
 
@@ -480,7 +497,12 @@ export default function Polls() {
                   <Label>Duration (when broadcast)</Label>
                   <Select
                     value={formData.duration_days}
-                    onValueChange={(value) => setFormData({ ...formData, duration_days: value })}
+                    onValueChange={(value) => {
+                      setFormData({ ...formData, duration_days: value });
+                      if (value !== 'custom') {
+                        setCustomEndDate(undefined);
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -491,10 +513,45 @@ export default function Polls() {
                       <SelectItem value="7">1 Week</SelectItem>
                       <SelectItem value="14">2 Weeks</SelectItem>
                       <SelectItem value="30">1 Month</SelectItem>
+                      <SelectItem value="custom">Custom Date</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
+              {formData.duration_days === 'custom' && (
+                <div className="space-y-2">
+                  <Label>Select End Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !customEndDate && 'text-gray-500'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                        {customEndDate ? format(customEndDate, 'PPP') : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customEndDate}
+                        onSelect={setCustomEndDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {customEndDate && (
+                    <p className="text-xs text-gray-500 font-light">
+                      Poll will close on {format(customEndDate, 'PPP')}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Post to Communities (Optional)</Label>
