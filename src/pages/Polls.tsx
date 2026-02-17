@@ -59,6 +59,7 @@ export default function Polls() {
   });
 
   const [optionInputs, setOptionInputs] = useState<string[]>(['', '']);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function Polls() {
       target_communities: [],
     });
     setOptionInputs(['', '']);
+    setCustomStartDate(undefined);
     setCustomEndDate(undefined);
   };
 
@@ -217,16 +219,24 @@ export default function Polls() {
         pollData.created_by = user.id;
 
         if (broadcast) {
+          let startDate: Date;
           let endDate: Date;
+
           if (formData.duration_days === 'custom') {
+            if (!customStartDate) {
+              throw new Error('Please select a custom start date');
+            }
             if (!customEndDate) {
               throw new Error('Please select a custom end date');
             }
+            startDate = customStartDate;
             endDate = customEndDate;
           } else {
+            startDate = new Date();
             endDate = addDays(new Date(), parseInt(formData.duration_days));
           }
-          pollData.scheduled_start = new Date().toISOString();
+
+          pollData.scheduled_start = startDate.toISOString();
           pollData.scheduled_end = endDate.toISOString();
         }
       }
@@ -500,6 +510,7 @@ export default function Polls() {
                     onValueChange={(value) => {
                       setFormData({ ...formData, duration_days: value });
                       if (value !== 'custom') {
+                        setCustomStartDate(undefined);
                         setCustomEndDate(undefined);
                       }
                     }}
@@ -520,48 +531,95 @@ export default function Polls() {
               </div>
 
               {formData.duration_days === 'custom' && (
-                <div className="space-y-2">
-                  <Label>Select End Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          'w-full justify-start text-left font-normal',
-                          !customEndDate && 'text-gray-500'
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                        {customEndDate ? format(customEndDate, 'PPP') : 'Pick a date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
+                <>
+                  <div className="space-y-2">
+                    <Label>Select Start Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !customStartDate && 'text-gray-500'
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                          {customStartDate ? format(customStartDate, 'PPP') : 'Pick a start date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={customStartDate}
+                          onSelect={setCustomStartDate}
+                          initialFocus
+                          classNames={{
+                            day: cn(
+                              buttonVariants({ variant: 'ghost' }),
+                              'h-8 w-8 p-0 font-normal bg-white hover:bg-white border border-gray-400 hover:border-gray-600'
+                            ),
+                            day_today: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white !border-transparent',
+                            day_selected: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white focus:bg-[#d1242a] focus:text-white !border-transparent',
+                            day_disabled: 'bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white border border-gray-300',
+                            day_outside: 'text-gray-300 opacity-30 !border-transparent bg-white',
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {customStartDate && (
+                      <p className="text-xs text-gray-500 font-light">
+                        Poll will start on {format(customStartDate, 'PPP')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Select End Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !customEndDate && 'text-gray-500'
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                          {customEndDate ? format(customEndDate, 'PPP') : 'Pick an end date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
                         mode="single"
                         selected={customEndDate}
                         onSelect={setCustomEndDate}
-                        disabled={(date) => date < new Date()}
+                        disabled={(date) => {
+                          if (customStartDate) {
+                            return date < customStartDate;
+                          }
+                          return date < new Date();
+                        }}
                         initialFocus
                         modifiers={{
                           inRange: (date) => {
-                            if (!customEndDate) return false;
-                            const today = new Date();
-                            today.setHours(0, 0, 0, 0);
+                            if (!customStartDate || !customEndDate) return false;
                             const checkDate = new Date(date);
                             checkDate.setHours(0, 0, 0, 0);
+                            const startDate = new Date(customStartDate);
+                            startDate.setHours(0, 0, 0, 0);
                             const endDate = new Date(customEndDate);
                             endDate.setHours(0, 0, 0, 0);
-                            return checkDate > today && checkDate < endDate;
+                            return checkDate > startDate && checkDate < endDate;
                           },
                           rangeEdge: (date) => {
-                            if (!customEndDate) return false;
-                            const today = new Date();
-                            today.setHours(0, 0, 0, 0);
+                            if (!customStartDate || !customEndDate) return false;
                             const checkDate = new Date(date);
                             checkDate.setHours(0, 0, 0, 0);
+                            const startDate = new Date(customStartDate);
+                            startDate.setHours(0, 0, 0, 0);
                             const endDate = new Date(customEndDate);
                             endDate.setHours(0, 0, 0, 0);
-                            return checkDate.getTime() === today.getTime() || checkDate.getTime() === endDate.getTime();
+                            return checkDate.getTime() === startDate.getTime() || checkDate.getTime() === endDate.getTime();
                           },
                         }}
                         modifiersClassNames={{
@@ -586,7 +644,8 @@ export default function Polls() {
                       Poll will close on {format(customEndDate, 'PPP')}
                     </p>
                   )}
-                </div>
+                  </div>
+                </>
               )}
 
               <div className="space-y-2">
