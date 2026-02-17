@@ -632,7 +632,7 @@ export default function PartyManagement() {
                           <div className="flex items-center gap-3 flex-1">
                             <GripVertical className="h-5 w-5 text-gray-400" />
                             <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded text-gray-500 text-sm font-medium">
-                              {leader.sort_order + 1}
+                              {leader.sort_order}
                             </div>
                             <div>
                               <h3 className="font-medium">{leader.name}</h3>
