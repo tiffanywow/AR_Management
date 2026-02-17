@@ -73,6 +73,7 @@ export default function Members() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [regionClassifications, setRegionClassifications] = useState<RegionClassification[]>([]);
+  const [cardPreviewDialogOpen, setCardPreviewDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -380,6 +381,14 @@ export default function Members() {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleDownloadCard = () => {
+    setCardPreviewDialogOpen(true);
+  };
+
+  const handlePrintCard = () => {
+    window.print();
   };
 
   const handleExport = () => {
@@ -934,12 +943,151 @@ export default function Members() {
 
               {selectedMember.status === 'approved' && selectedMember.approved_at && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-green-900 mb-2">Approval Information</h4>
-                  <p className="text-sm text-green-800">
-                    Approved on {new Date(selectedMember.approved_at).toLocaleDateString()}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-green-900 mb-2">Approval Information</h4>
+                      <p className="text-sm text-green-800">
+                        Approved on {new Date(selectedMember.approved_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {selectedMember.membership_number && (
+                      <Button
+                        variant="outline"
+                        className="text-[#d1242a] border-[#d1242a] hover:bg-[#d1242a] hover:text-white"
+                        onClick={handleDownloadCard}
+                      >
+                        <Download className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                        Download Card
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cardPreviewDialogOpen} onOpenChange={setCardPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Membership Card Preview</DialogTitle>
+            <DialogDescription>
+              Preview and download the membership card for {selectedMember?.full_name} {selectedMember?.surname}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedMember && selectedMember.status === 'approved' && selectedMember.membership_number && (
+            <div className="space-y-6">
+              <div id="membership-card-preview" className="bg-white p-8">
+                <div className="border-4 border-[#d1242a] rounded-2xl overflow-hidden shadow-xl max-w-2xl mx-auto">
+                  <div className="bg-[#d1242a] text-white p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+                          <span className="text-3xl font-bold text-[#d1242a]">
+                            {selectedMember.full_name.charAt(0)}{selectedMember.surname.charAt(0)}
+                          </span>
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold">PARTY NAME</h2>
+                          <p className="text-sm opacity-90">Official Member Card</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs opacity-90">Member ID</p>
+                        <p className="text-xl font-bold">{selectedMember.membership_number}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-gray-50 to-white p-8">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Full Name</p>
+                          <p className="text-lg font-bold text-gray-900">{selectedMember.full_name} {selectedMember.surname}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">ID Number</p>
+                          <p className="text-base font-medium text-gray-900">{selectedMember.id_number || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Region</p>
+                          <p className="text-base font-medium text-gray-900">{selectedMember.region || 'N/A'}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Phone Number</p>
+                          <p className="text-base font-medium text-gray-900">{selectedMember.phone_number || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Member Since</p>
+                          <p className="text-base font-medium text-gray-900">
+                            {selectedMember.approved_at ? new Date(selectedMember.approved_at).toLocaleDateString('en-GB', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            }) : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Constituency</p>
+                          <p className="text-base font-medium text-gray-900">{selectedMember.constituency || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedMember.passport_photo_url && (
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-200">
+                            <img
+                              src={selectedMember.passport_photo_url}
+                              alt="Member Photo"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-500 mb-1">This card certifies that the above-named individual is an official member in good standing.</p>
+                            <p className="text-xs text-[#d1242a] font-semibold mt-2">Valid until further notice</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!selectedMember.passport_photo_url && (
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <p className="text-xs text-gray-500">This card certifies that the above-named individual is an official member in good standing.</p>
+                        <p className="text-xs text-[#d1242a] font-semibold mt-2">Valid until further notice</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-gray-100 px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                    <p className="text-xs text-gray-600">Issued: {new Date().toLocaleDateString('en-GB')}</p>
+                    <p className="text-xs text-gray-600 font-semibold">OFFICIAL MEMBERSHIP CARD</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setCardPreviewDialogOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  className="bg-[#d1242a] hover:bg-[#b91c1c]"
+                  onClick={handlePrintCard}
+                >
+                  <Download className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                  Download PDF
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
