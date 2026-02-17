@@ -553,19 +553,21 @@ export default function Polls() {
                             endDate.setHours(0, 0, 0, 0);
                             return checkDate > today && checkDate < endDate;
                           },
+                          noBorder: () => !!customEndDate,
                         }}
                         modifiersClassNames={{
-                          inRange: 'bg-red-50 border-red-200',
+                          inRange: 'bg-red-50 border-transparent',
+                          noBorder: 'border-transparent',
                         }}
                         classNames={{
                           day: cn(
                             buttonVariants({ variant: 'ghost' }),
-                            'h-8 w-8 p-0 font-normal border border-gray-400 hover:border-gray-600 hover:bg-gray-50'
+                            'h-8 w-8 p-0 font-normal bg-white border border-gray-400 hover:border-gray-600 hover:bg-white'
                           ),
-                          day_today: 'border-2 border-[#d1242a] bg-transparent text-gray-900 font-semibold hover:bg-red-50',
+                          day_today: 'border-2 border-[#d1242a] bg-white text-gray-900 font-semibold hover:bg-white',
                           day_selected: 'border-2 border-[#d1242a] bg-[#d1242a] text-white hover:bg-[#b91c1c] hover:text-white focus:bg-[#d1242a] focus:text-white',
-                          day_disabled: 'border border-gray-300 text-gray-400 opacity-50 cursor-not-allowed hover:bg-transparent',
-                          day_outside: 'text-gray-300 opacity-30 border-transparent',
+                          day_disabled: 'border border-gray-300 bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white',
+                          day_outside: 'text-gray-300 opacity-30 border-transparent bg-white',
                         }}
                       />
                     </PopoverContent>
