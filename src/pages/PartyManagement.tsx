@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Edit, Trash2, Save, Building2, Target, Award, Users, Phone, Mail, Globe, MapPin, Map, Edit2, X, GripVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -92,6 +93,8 @@ export default function PartyManagement() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [draggedLeader, setDraggedLeader] = useState<Leader | null>(null);
   const [currentLeaderLevel, setCurrentLeaderLevel] = useState<'national' | 'regional' | 'district' | 'community'>('national');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; table: string; level?: string } | null>(null);
 
   useEffect(() => {
     fetchAllData();
@@ -287,14 +290,45 @@ export default function PartyManagement() {
     }
   };
 
-  const handleDelete = async (id: string, table: string) => {
+  const handleDeleteClick = (id: string, table: string, level?: string) => {
+    setItemToDelete({ id, table, level });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+
     try {
+      const { id, table, level } = itemToDelete;
+
       const { error } = await supabase
         .from(table)
         .delete()
         .eq('id', id);
       if (error) throw error;
+
+      if (table === 'about_leadership' && level) {
+        const remainingLeaders = leadership
+          .filter(l => l.level === level && l.id !== id)
+          .sort((a, b) => a.sort_order - b.sort_order);
+
+        const updates = remainingLeaders.map((leader, index) => ({
+          id: leader.id,
+          sort_order: index + 1
+        }));
+
+        for (const update of updates) {
+          const { error: updateError } = await supabase
+            .from('about_leadership')
+            .update({ sort_order: update.sort_order })
+            .eq('id', update.id);
+          if (updateError) throw updateError;
+        }
+      }
+
       toast({ title: 'Success', description: 'Item deleted' });
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
       fetchAllData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -544,7 +578,7 @@ export default function PartyManagement() {
                       <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('values', value)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(value.id, 'about_values')}>
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(value.id, 'about_values')}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -610,7 +644,7 @@ export default function PartyManagement() {
                             <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('leadership', leader, level)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(leader.id, 'about_leadership')}>
+                            <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(leader.id, 'about_leadership', level)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -650,7 +684,7 @@ export default function PartyManagement() {
                       <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('achievements', achievement)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(achievement.id, 'about_achievements')}>
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(achievement.id, 'about_achievements')}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -695,7 +729,7 @@ export default function PartyManagement() {
                       <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('contacts', contact)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(contact.id, 'about_contact')}>
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(contact.id, 'about_contact')}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -831,6 +865,23 @@ export default function PartyManagement() {
         loading={loading}
         leaderLevel={currentLeaderLevel}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this item from the list. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-[#d1242a] hover:bg-[#b91c1c]">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
