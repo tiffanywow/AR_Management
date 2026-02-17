@@ -527,20 +527,14 @@ export default function Polls() {
                   </Select>
                   {formData.duration_days && formData.duration_days !== 'custom' && (
                     <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-600 font-medium">Start Date:</span>
-                          <span className="text-gray-900">{format(new Date(), 'LLL dd, y')}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-600 font-medium">End Date:</span>
-                          <span className="text-gray-900">{format(addDays(new Date(), parseInt(formData.duration_days)), 'LLL dd, y')}</span>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500 text-center">
-                        Poll will run for {formData.duration_days} day{parseInt(formData.duration_days) > 1 ? 's' : ''}
+                      <div className="text-sm text-left">
+                        <span className="text-gray-600 font-medium">Start Date:</span> <span className="text-gray-900">{format(new Date(), 'LLL dd, y')}</span>
+                        <span className="mx-3 text-gray-400">•</span>
+                        <span className="text-gray-600 font-medium">End Date:</span> <span className="text-gray-900">{format(addDays(new Date(), parseInt(formData.duration_days)), 'LLL dd, y')}</span>
+                        <span className="mx-3 text-gray-400">•</span>
+                        <span className="text-xs text-gray-500">
+                          {formData.duration_days} day{parseInt(formData.duration_days) > 1 ? 's' : ''}
+                        </span>
                       </div>
                     </div>
                   )}
