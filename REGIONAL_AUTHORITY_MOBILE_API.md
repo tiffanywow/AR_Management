@@ -319,6 +319,118 @@ const getConstituencyCandidateDetails = async (candidateId) => {
 
 ---
 
+## Edge Function API
+
+### `get-regional-authorities`
+
+A dedicated edge function that returns all regional authorities with their constituencies and candidates in a single API call.
+
+**Endpoint:**
+```
+POST {SUPABASE_URL}/functions/v1/get-regional-authorities
+```
+
+**Headers:**
+```javascript
+{
+  'Authorization': 'Bearer {USER_JWT_TOKEN}',
+  'Content-Type': 'application/json'
+}
+```
+
+**Response Format:**
+```json
+{
+  "authorities": [
+    {
+      "id": "uuid",
+      "name": "Authority Name",
+      "description": "Authority description",
+      "latitude": -22.5609,
+      "longitude": 17.0658,
+      "location_name": "Windhoek, Namibia",
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z",
+      "constituencies": [
+        {
+          "id": "uuid",
+          "regional_authority_id": "uuid",
+          "name": "Constituency Name",
+          "description": "Constituency description",
+          "is_active": true,
+          "created_at": "2024-01-01T00:00:00Z",
+          "updated_at": "2024-01-01T00:00:00Z",
+          "candidates": [
+            {
+              "id": "uuid",
+              "constituency_id": "uuid",
+              "full_name": "Candidate Name",
+              "bio": "Candidate biography",
+              "photo_url": "https://...",
+              "position": "Member of Parliament",
+              "party_affiliation": "Party Name",
+              "contact_email": "candidate@example.com",
+              "contact_phone": "+264...",
+              "is_active": true,
+              "created_at": "2024-01-01T00:00:00Z",
+              "updated_at": "2024-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ],
+      "regional_candidates": [
+        {
+          "id": "uuid",
+          "regional_authority_id": "uuid",
+          "full_name": "Candidate Name",
+          "bio": "Candidate biography",
+          "photo_url": "https://...",
+          "position": "Regional Councillor",
+          "party_affiliation": "Party Name",
+          "contact_email": "candidate@example.com",
+          "contact_phone": "+264...",
+          "is_active": true,
+          "created_at": "2024-01-01T00:00:00Z",
+          "updated_at": "2024-01-01T00:00:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Usage Example:**
+```javascript
+const fetchRegionalAuthorities = async (userToken) => {
+  const response = await fetch(
+    `${SUPABASE_URL}/functions/v1/get-regional-authorities`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${userToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch regional authorities');
+  }
+
+  const { authorities } = await response.json();
+  return authorities;
+};
+```
+
+**Benefits:**
+- Single API call fetches all data (authorities, constituencies, and candidates)
+- Includes nested relationships automatically
+- Optimized for mobile app performance
+- Authenticated access ensures data consistency
+
+---
+
 ## Security & Permissions
 
 All tables have Row Level Security (RLS) enabled with the following policies:
