@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
 
 interface PollOption {
   text: string;
@@ -59,8 +60,7 @@ export default function Polls() {
   });
 
   const [optionInputs, setOptionInputs] = useState<string[]>(['', '']);
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
 
   useEffect(() => {
     fetchPolls();
@@ -139,8 +139,7 @@ export default function Polls() {
       target_communities: [],
     });
     setOptionInputs(['', '']);
-    setCustomStartDate(undefined);
-    setCustomEndDate(undefined);
+    setCustomDateRange(undefined);
   };
 
   const handleSavePoll = async (broadcast: boolean) => {
@@ -223,14 +222,14 @@ export default function Polls() {
           let endDate: Date;
 
           if (formData.duration_days === 'custom') {
-            if (!customStartDate) {
-              throw new Error('Please select a custom start date');
+            if (!customDateRange?.from) {
+              throw new Error('Please select a start date');
             }
-            if (!customEndDate) {
-              throw new Error('Please select a custom end date');
+            if (!customDateRange?.to) {
+              throw new Error('Please select an end date');
             }
-            startDate = customStartDate;
-            endDate = customEndDate;
+            startDate = customDateRange.from;
+            endDate = customDateRange.to;
           } else {
             startDate = new Date();
             endDate = addDays(new Date(), parseInt(formData.duration_days));
@@ -280,15 +279,15 @@ export default function Polls() {
       } else if (editingPollId) {
         toastTitle = broadcast ? 'Poll Updated & Broadcasted' : 'Poll Updated';
         toastDescription = broadcast
-          ? formData.duration_days === 'custom' && customEndDate
-            ? `Your poll is now live and will close on ${format(customEndDate, 'PPP')}`
+          ? formData.duration_days === 'custom' && customDateRange?.to
+            ? `Your poll is now live and will close on ${format(customDateRange.to, 'PPP')}`
             : `Your poll is now live and will close in ${formData.duration_days} days`
           : 'Your changes have been saved';
       } else {
         toastTitle = broadcast ? 'Poll Broadcasted' : 'Poll Saved as Draft';
         toastDescription = broadcast
-          ? formData.duration_days === 'custom' && customEndDate
-            ? `Your poll is now live and will close on ${format(customEndDate, 'PPP')}`
+          ? formData.duration_days === 'custom' && customDateRange?.to
+            ? `Your poll is now live and will close on ${format(customDateRange.to, 'PPP')}`
             : `Your poll is now live and will close in ${formData.duration_days} days`
           : 'You can broadcast this poll later from the drafts section';
       }
@@ -510,8 +509,7 @@ export default function Polls() {
                     onValueChange={(value) => {
                       setFormData({ ...formData, duration_days: value });
                       if (value !== 'custom') {
-                        setCustomStartDate(undefined);
-                        setCustomEndDate(undefined);
+                        setCustomDateRange(undefined);
                       }
                     }}
                   >
@@ -531,101 +529,38 @@ export default function Polls() {
               </div>
 
               {formData.duration_days === 'custom' && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Select Start Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full justify-start text-left font-normal',
-                            !customStartDate && 'text-gray-500'
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                          {customStartDate ? format(customStartDate, 'PPP') : 'Pick a start date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={customStartDate}
-                          onSelect={setCustomStartDate}
-                          initialFocus
-                          classNames={{
-                            day: cn(
-                              buttonVariants({ variant: 'ghost' }),
-                              'h-8 w-8 p-0 font-normal bg-white hover:bg-white border border-gray-400 hover:border-gray-600'
-                            ),
-                            day_today: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white !border-transparent',
-                            day_selected: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white focus:bg-[#d1242a] focus:text-white !border-transparent',
-                            day_disabled: 'bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white border border-gray-300',
-                            day_outside: 'text-gray-300 opacity-30 !border-transparent bg-white',
-                          }}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    {customStartDate && (
-                      <p className="text-xs text-gray-500 font-light">
-                        Poll will start on {format(customStartDate, 'PPP')}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Select End Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full justify-start text-left font-normal',
-                            !customEndDate && 'text-gray-500'
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                          {customEndDate ? format(customEndDate, 'PPP') : 'Pick an end date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                        mode="single"
-                        selected={customEndDate}
-                        onSelect={setCustomEndDate}
-                        disabled={(date) => {
-                          if (customStartDate) {
-                            return date < customStartDate;
-                          }
-                          return date < new Date();
-                        }}
+                <div className="space-y-2">
+                  <Label>Select Date Range</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !customDateRange && 'text-gray-500'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                        {customDateRange?.from ? (
+                          customDateRange.to ? (
+                            <>
+                              {format(customDateRange.from, 'LLL dd, y')} - {format(customDateRange.to, 'LLL dd, y')}
+                            </>
+                          ) : (
+                            format(customDateRange.from, 'LLL dd, y')
+                          )
+                        ) : (
+                          'Pick a date range'
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="range"
+                        selected={customDateRange}
+                        onSelect={setCustomDateRange}
+                        numberOfMonths={2}
                         initialFocus
-                        modifiers={{
-                          inRange: (date) => {
-                            if (!customStartDate || !customEndDate) return false;
-                            const checkDate = new Date(date);
-                            checkDate.setHours(0, 0, 0, 0);
-                            const startDate = new Date(customStartDate);
-                            startDate.setHours(0, 0, 0, 0);
-                            const endDate = new Date(customEndDate);
-                            endDate.setHours(0, 0, 0, 0);
-                            return checkDate > startDate && checkDate < endDate;
-                          },
-                          rangeEdge: (date) => {
-                            if (!customStartDate || !customEndDate) return false;
-                            const checkDate = new Date(date);
-                            checkDate.setHours(0, 0, 0, 0);
-                            const startDate = new Date(customStartDate);
-                            startDate.setHours(0, 0, 0, 0);
-                            const endDate = new Date(customEndDate);
-                            endDate.setHours(0, 0, 0, 0);
-                            return checkDate.getTime() === startDate.getTime() || checkDate.getTime() === endDate.getTime();
-                          },
-                        }}
-                        modifiersClassNames={{
-                          inRange: 'bg-[#fecaca] !border-transparent',
-                          rangeEdge: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white !border-transparent',
-                        }}
                         classNames={{
                           day: cn(
                             buttonVariants({ variant: 'ghost' }),
@@ -633,19 +568,21 @@ export default function Polls() {
                           ),
                           day_today: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white !border-transparent',
                           day_selected: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white focus:bg-[#d1242a] focus:text-white !border-transparent',
+                          day_range_start: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white !border-transparent',
+                          day_range_end: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white !border-transparent',
+                          day_range_middle: 'bg-[#fecaca] !border-transparent',
                           day_disabled: 'bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white border border-gray-300',
                           day_outside: 'text-gray-300 opacity-30 !border-transparent bg-white',
                         }}
                       />
                     </PopoverContent>
                   </Popover>
-                  {customEndDate && (
+                  {customDateRange?.from && customDateRange?.to && (
                     <p className="text-xs text-gray-500 font-light">
-                      Poll will close on {format(customEndDate, 'PPP')}
+                      Poll will run from {format(customDateRange.from, 'PPP')} to {format(customDateRange.to, 'PPP')}
                     </p>
                   )}
-                  </div>
-                </>
+                </div>
               )}
 
               <div className="space-y-2">
