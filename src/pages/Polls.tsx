@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, BarChart3, Clock, CheckCircle2, Users, X, Save, Send, Edit } from 'lucide-react';
+import { Plus, BarChart3, Clock, CheckCircle2, Users, X, Save, Send, Edit, PlayCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,6 +44,7 @@ export default function Polls() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
+  const [closePollId, setClosePollId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     question: '',
@@ -277,12 +279,14 @@ export default function Polls() {
     }
   };
 
-  const handleClosePoll = async (pollId: string) => {
+  const handleClosePoll = async () => {
+    if (!closePollId) return;
+
     try {
       const { error } = await supabase
         .from('polls')
         .update({ status: 'closed' })
-        .eq('id', pollId);
+        .eq('id', closePollId);
 
       if (error) throw error;
 
@@ -291,11 +295,36 @@ export default function Polls() {
         description: 'The poll has been closed to new responses',
       });
 
+      setClosePollId(null);
       fetchPolls();
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error.message || 'Failed to close poll',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleReopenPoll = async (pollId: string) => {
+    try {
+      const { error } = await supabase
+        .from('polls')
+        .update({ status: 'active' })
+        .eq('id', pollId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Poll Reopened',
+        description: 'The poll is now active and accepting responses',
+      });
+
+      fetchPolls();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reopen poll',
         variant: 'destructive',
       });
     }
@@ -621,7 +650,7 @@ export default function Polls() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleClosePoll(poll.id)}
+                      onClick={() => setClosePollId(poll.id)}
                     >
                       Close Poll
                     </Button>
@@ -674,23 +703,65 @@ export default function Polls() {
             <CardTitle className="text-lg font-medium">Closed Polls</CardTitle>
             <CardDescription>Completed polls and their results</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {closedPolls.map((poll) => {
               const totalVotes = poll.total_votes || 0;
-              const winningOption = poll.options.reduce((max, opt) =>
-                opt.votes > max.votes ? opt : max, poll.options[0]
-              );
               return (
-                <div key={poll.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
+                <div key={poll.id} className="border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="font-medium text-gray-900 mb-1">{poll.question}</h3>
-                      <p className="text-sm text-gray-600 font-light">
-                        Winner: <span className="font-medium">{winningOption.text}</span> with{' '}
-                        {winningOption.votes} votes ({totalVotes} total)
-                      </p>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="font-medium text-gray-900">{poll.question}</h3>
+                        <Badge className="bg-gray-100 text-gray-800">Closed</Badge>
+                      </div>
+                      {poll.description && (
+                        <p className="text-sm text-gray-600 font-light">{poll.description}</p>
+                      )}
                     </div>
-                    <Badge className="bg-gray-100 text-gray-800">Closed</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReopenPoll(poll.id)}
+                      className="text-[#d1242a] border-[#d1242a] hover:bg-[#d1242a] hover:text-white"
+                    >
+                      <PlayCircle className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      Reopen Poll
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3 mb-4">
+                    {poll.options.map((option, idx) => {
+                      const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-light text-gray-700">{option.text}</span>
+                            <span className="font-medium text-gray-900">
+                              {option.votes} ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-gray-400 h-2 rounded-full transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center space-x-6 text-sm text-gray-600 font-light">
+                    <div className="flex items-center space-x-2">
+                      <Users className="h-4 w-4" strokeWidth={1.5} />
+                      <span>{poll.total_participants || 0} participants</span>
+                    </div>
+                    {poll.scheduled_end && (
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-4 w-4" strokeWidth={1.5} />
+                        <span>Closed {format(new Date(poll.scheduled_end), 'PPP')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -698,6 +769,26 @@ export default function Polls() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={closePollId !== null} onOpenChange={(open) => !open && setClosePollId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to close this poll?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will stop the poll from accepting new responses. Users will no longer be able to vote on this poll. You can reopen it later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClosePoll}
+              className="bg-[#d1242a] hover:bg-[#b91c1c]"
+            >
+              Close Poll
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
