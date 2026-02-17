@@ -44,6 +44,7 @@ export default function Polls() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
+  const [editingPollStatus, setEditingPollStatus] = useState<string | null>(null);
   const [closePollId, setClosePollId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -110,6 +111,7 @@ export default function Polls() {
 
   const handleEditPoll = (poll: Poll) => {
     setEditingPollId(poll.id);
+    setEditingPollStatus(poll.status);
     setFormData({
       question: poll.question,
       description: poll.description || '',
@@ -123,6 +125,7 @@ export default function Polls() {
 
   const resetForm = () => {
     setEditingPollId(null);
+    setEditingPollStatus(null);
     setFormData({
       question: '',
       description: '',
@@ -167,27 +170,52 @@ export default function Polls() {
     setLoading(true);
 
     try {
-      const pollOptions: PollOption[] = validOptions.map(text => ({
-        text: text.trim(),
-        votes: 0,
-      }));
+      let pollOptions: PollOption[];
+
+      if (editingPollId && editingPollStatus === 'active') {
+        const existingPoll = polls.find(p => p.id === editingPollId);
+        pollOptions = validOptions.map((text, index) => {
+          const existingOption = existingPoll?.options[index];
+          return {
+            text: text.trim(),
+            votes: existingOption ? existingOption.votes : 0,
+          };
+        });
+      } else {
+        pollOptions = validOptions.map(text => ({
+          text: text.trim(),
+          votes: 0,
+        }));
+      }
 
       const pollData: any = {
         question: formData.question.trim(),
         description: formData.description.trim() || null,
         poll_type: formData.poll_type,
         options: pollOptions,
-        status: broadcast ? 'active' : 'draft',
         target_communities: formData.target_communities.length > 0 ? formData.target_communities : null,
-        total_votes: 0,
-        total_participants: 0,
-        created_by: user.id,
       };
 
-      if (broadcast) {
-        const endDate = addDays(new Date(), parseInt(formData.duration_days));
-        pollData.scheduled_start = new Date().toISOString();
-        pollData.scheduled_end = endDate.toISOString();
+      if (editingPollId && editingPollStatus === 'active') {
+        const existingPoll = polls.find(p => p.id === editingPollId);
+        if (existingPoll) {
+          pollData.status = existingPoll.status;
+          pollData.scheduled_start = existingPoll.scheduled_start;
+          pollData.scheduled_end = existingPoll.scheduled_end;
+          pollData.total_votes = existingPoll.total_votes;
+          pollData.total_participants = existingPoll.total_participants;
+        }
+      } else {
+        pollData.status = broadcast ? 'active' : 'draft';
+        pollData.total_votes = 0;
+        pollData.total_participants = 0;
+        pollData.created_by = user.id;
+
+        if (broadcast) {
+          const endDate = addDays(new Date(), parseInt(formData.duration_days));
+          pollData.scheduled_start = new Date().toISOString();
+          pollData.scheduled_end = endDate.toISOString();
+        }
       }
 
       console.log('Poll data:', pollData);
@@ -220,15 +248,27 @@ export default function Polls() {
 
       console.log('Poll saved successfully:', data);
 
-      toast({
-        title: editingPollId
-          ? (broadcast ? 'Poll Updated & Broadcasted' : 'Poll Updated')
-          : (broadcast ? 'Poll Broadcasted' : 'Poll Saved as Draft'),
-        description: broadcast
+      let toastTitle = '';
+      let toastDescription = '';
+
+      if (editingPollId && editingPollStatus === 'active') {
+        toastTitle = 'Poll Updated';
+        toastDescription = 'Your changes have been saved. The poll remains active.';
+      } else if (editingPollId) {
+        toastTitle = broadcast ? 'Poll Updated & Broadcasted' : 'Poll Updated';
+        toastDescription = broadcast
           ? `Your poll is now live and will close in ${formData.duration_days} days`
-          : editingPollId
-          ? 'Your changes have been saved'
-          : 'You can broadcast this poll later from the drafts section',
+          : 'Your changes have been saved';
+      } else {
+        toastTitle = broadcast ? 'Poll Broadcasted' : 'Poll Saved as Draft';
+        toastDescription = broadcast
+          ? `Your poll is now live and will close in ${formData.duration_days} days`
+          : 'You can broadcast this poll later from the drafts section';
+      }
+
+      toast({
+        title: toastTitle,
+        description: toastDescription,
       });
 
       setDialogOpen(false);
@@ -498,23 +538,36 @@ export default function Polls() {
               </div>
 
               <div className="flex space-x-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => handleSavePoll(false)}
-                  disabled={loading}
-                >
-                  <Save className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                  {loading ? 'Saving...' : editingPollId ? 'Update Draft' : 'Save as Draft'}
-                </Button>
-                <Button
-                  className="flex-1 bg-[#d1242a] hover:bg-[#b91c1c]"
-                  onClick={() => handleSavePoll(true)}
-                  disabled={loading}
-                >
-                  <Send className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                  {loading ? 'Broadcasting...' : editingPollId ? 'Update & Broadcast' : 'Broadcast Now'}
-                </Button>
+                {editingPollId && editingPollStatus === 'active' ? (
+                  <Button
+                    className="flex-1 bg-[#d1242a] hover:bg-[#b91c1c]"
+                    onClick={() => handleSavePoll(false)}
+                    disabled={loading}
+                  >
+                    <Save className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleSavePoll(false)}
+                      disabled={loading}
+                    >
+                      <Save className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      {loading ? 'Saving...' : editingPollId ? 'Update Draft' : 'Save as Draft'}
+                    </Button>
+                    <Button
+                      className="flex-1 bg-[#d1242a] hover:bg-[#b91c1c]"
+                      onClick={() => handleSavePoll(true)}
+                      disabled={loading}
+                    >
+                      <Send className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      {loading ? 'Broadcasting...' : editingPollId ? 'Update & Broadcast' : 'Broadcast Now'}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </DialogContent>
@@ -647,13 +700,23 @@ export default function Polls() {
                         <p className="text-sm text-gray-600 font-light">{poll.description}</p>
                       )}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setClosePollId(poll.id)}
-                    >
-                      Close Poll
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditPoll(poll)}
+                      >
+                        <Edit className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setClosePollId(poll.id)}
+                      >
+                        Close Poll
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-3 mb-4">
