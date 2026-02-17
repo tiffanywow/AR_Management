@@ -370,6 +370,11 @@ export default function PartyManagement() {
     return leadership.filter(l => l.level === level).sort((a, b) => a.sort_order - b.sort_order);
   };
 
+  const getUniquePositions = () => {
+    const positions = leadership.map(l => l.position).filter(Boolean);
+    return Array.from(new Set(positions));
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -795,12 +800,13 @@ export default function PartyManagement() {
         onSave={handleSaveItem}
         loading={loading}
         leaderLevel={currentLeaderLevel}
+        existingPositions={getUniquePositions()}
       />
     </div>
   );
 }
 
-function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leaderLevel }: any) {
+function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leaderLevel, existingPositions }: any) {
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
@@ -886,7 +892,15 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leader
                 <Input
                   value={formData.position || ''}
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                  list="positions-list"
+                  placeholder="Enter position title (e.g., President, Secretary)"
                 />
+                <datalist id="positions-list">
+                  {existingPositions?.map((pos: string, idx: number) => (
+                    <option key={idx} value={pos} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-gray-500">Type any custom position or select from existing ones</p>
               </div>
               <div className="space-y-2">
                 <Label>Region</Label>
