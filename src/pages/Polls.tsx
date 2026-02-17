@@ -573,8 +573,8 @@ export default function Polls() {
                             buttonVariants({ variant: 'ghost' }),
                             'h-8 w-8 p-0 font-normal bg-white hover:bg-white border border-gray-400 hover:border-gray-600'
                           ),
-                          day_today: 'bg-[#d1242a] text-white font-semibold hover:bg-[#b91c1c] border-transparent',
-                          day_selected: 'bg-[#d1242a] text-white hover:bg-[#b91c1c] hover:text-white focus:bg-[#d1242a] focus:text-white border-transparent',
+                          day_today: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white border-transparent',
+                          day_selected: 'bg-[#d1242a] text-white font-semibold hover:bg-[#d1242a] hover:text-white focus:bg-[#d1242a] focus:text-white border-transparent',
                           day_disabled: 'bg-white text-gray-400 opacity-50 cursor-not-allowed hover:bg-white border border-gray-300',
                           day_outside: 'text-gray-300 opacity-30 border-transparent bg-white',
                         }}
