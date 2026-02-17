@@ -483,7 +483,7 @@ export default function Polls() {
                               });
                             }
                           }}
-                          className="appearance-none rounded border-2 border-gray-400 bg-white w-4 h-4 cursor-pointer checked:bg-[#d1242a] checked:border-[#d1242a] focus:ring-2 focus:ring-[#d1242a] focus:ring-offset-0 relative checked:after:content-['✓'] checked:after:absolute checked:after:text-white checked:after:text-xs checked:after:left-[2px] checked:after:top-[-2px] checked:after:font-bold"
+                          className="appearance-none rounded border-2 border-gray-400 bg-white w-4 h-4 cursor-pointer checked:bg-[#d1242a] checked:border-[#d1242a] focus:outline-none relative checked:after:content-['✓'] checked:after:absolute checked:after:text-white checked:after:text-[10px] checked:after:left-1/2 checked:after:top-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:font-bold"
                         />
                         <span className="font-light">{community.name}</span>
                       </label>
