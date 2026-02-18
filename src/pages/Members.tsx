@@ -461,7 +461,7 @@ export default function Members() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Members</h1>
-          <p className="text-gray-600 font-light">Manage and analyze your party membership ({members.length} total members)</p>
+          <p className="text-gray-600 font-light">Manage and analyze your party membership</p>
         </div>
         <div className="flex items-center space-x-4">
           <Button variant="outline" size="sm" onClick={handleExport}>
@@ -731,7 +731,7 @@ export default function Members() {
                   <div className="flex items-center space-x-3 ml-4 flex-shrink-0">
                     <Badge
                       variant={member.status === 'approved' ? 'default' : 'secondary'}
-                      className={member.status === 'approved' ? 'bg-green-100 text-green-800' : member.status === 'review' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}
+                      className={member.status === 'approved' ? 'bg-green-100 text-green-800 pointer-events-none' : member.status === 'review' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}
                     >
                       {member.status}
                     </Badge>
@@ -812,7 +812,7 @@ export default function Members() {
                 </div>
                 <Badge
                   variant={selectedMember.status === 'approved' ? 'default' : 'secondary'}
-                  className={selectedMember.status === 'approved' ? 'bg-green-100 text-green-800' : selectedMember.status === 'review' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}
+                  className={selectedMember.status === 'approved' ? 'bg-green-100 text-green-800 pointer-events-none' : selectedMember.status === 'review' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}
                 >
                   {selectedMember.status}
                 </Badge>
