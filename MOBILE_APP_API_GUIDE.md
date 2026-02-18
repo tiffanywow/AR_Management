@@ -628,6 +628,95 @@ async function getAllCommunities(limit = 50, offset = 0) {
 ]
 ```
 
+### Join a Community
+
+Allow users to join public communities or request to join private communities.
+
+**IMPORTANT**:
+- For **public communities**: Users are added immediately with status `'active'`
+- For **private communities**: A join request is created with status `'requested'` and must be approved by admins on the management dashboard
+
+```javascript
+async function joinCommunity(userId, communityId, isPrivate = false) {
+  const status = isPrivate ? 'requested' : 'active';
+
+  const { data, error } = await supabase
+    .from('community_members')
+    .insert([{
+      community_id: communityId,
+      user_id: userId,
+      role: 'member',
+      status: status
+    }])
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    if (error.message?.includes('duplicate')) {
+      throw new Error('Already a member or request pending');
+    }
+    throw error;
+  }
+
+  if (!isPrivate) {
+    await supabase.rpc('increment_community_member_count', {
+      community_id: communityId
+    });
+  }
+
+  return data;
+}
+```
+
+**Response Format**:
+```json
+{
+  "id": "uuid",
+  "community_id": "uuid",
+  "user_id": "uuid",
+  "role": "member",
+  "status": "requested",
+  "joined_at": "2025-02-18T10:00:00Z"
+}
+```
+
+**UI Recommendations**:
+- Show "Join" button for public communities (immediate access)
+- Show "Request to Join" button for private communities
+- Display "Request Pending" status after requesting private community access
+- Show success message: "You've joined the community" (public) or "Request sent for approval" (private)
+
+### Check Community Membership Status
+
+Check if a user is a member of a community or has a pending request.
+
+```javascript
+async function getCommunityMembershipStatus(userId, communityId) {
+  const { data, error } = await supabase
+    .from('community_members')
+    .select('status, role')
+    .eq('user_id', userId)
+    .eq('community_id', communityId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+```
+
+**Response Format**:
+```json
+{
+  "status": "active",
+  "role": "member"
+}
+```
+
+Possible status values:
+- `"active"` - User is an active member
+- `"requested"` - Join request is pending approval
+- `null` - User is not a member and has no pending request
+
 ### Get Community Broadcasts
 
 Retrieve broadcasts targeted to a specific community.

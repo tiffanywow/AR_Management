@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown } from 'lucide-react';
+import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown, UserCheck, UserX, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,6 +58,8 @@ export default function Communities() {
   const [availableMembers, setAvailableMembers] = useState<any[]>([]);
   const [leaderDialogOpen, setLeaderDialogOpen] = useState(false);
   const [selectedLeaderTitle, setSelectedLeaderTitle] = useState('Community Leader');
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [requestsDialogOpen, setRequestsDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -69,6 +71,7 @@ export default function Communities() {
   useEffect(() => {
     fetchCommunities();
     fetchAvailableMembers();
+    fetchPendingRequests();
 
     const communitiesChannel = supabase
       .channel('communities_changes')
@@ -92,6 +95,7 @@ export default function Communities() {
         },
         (payload) => {
           fetchCommunities();
+          fetchPendingRequests();
           if (selectedCommunity) {
             fetchCommunityMembers(selectedCommunity.id);
           }
@@ -164,6 +168,40 @@ export default function Communities() {
       setCommunityMembers(membersWithDetails);
     } catch (error) {
       console.error('Error fetching community members:', error);
+    }
+  };
+
+  const fetchPendingRequests = async () => {
+    try {
+      const { data: requests, error } = await supabase
+        .from('community_members')
+        .select(`
+          *,
+          community:community_id(id, name, privacy_setting)
+        `)
+        .eq('status', 'requested')
+        .order('joined_at', { ascending: false });
+
+      if (error) throw error;
+
+      const requestsWithDetails = await Promise.all(
+        (requests || []).map(async (request) => {
+          const { data: membershipData } = await supabase
+            .from('memberships')
+            .select('id, user_id, full_name, surname, email, phone_number, region')
+            .eq('user_id', request.user_id)
+            .maybeSingle();
+
+          return {
+            ...request,
+            memberships: membershipData
+          };
+        })
+      );
+
+      setPendingRequests(requestsWithDetails);
+    } catch (error) {
+      console.error('Error fetching pending requests:', error);
     }
   };
 
@@ -384,6 +422,63 @@ export default function Communities() {
     setLeaderDialogOpen(true);
   };
 
+  const handleApproveRequest = async (requestId: string, communityId: string) => {
+    try {
+      const { error } = await supabase
+        .from('community_members')
+        .update({ status: 'active' })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      const community = communities.find(c => c.id === communityId);
+      if (community) {
+        await supabase
+          .from('communities')
+          .update({ member_count: community.member_count + 1 })
+          .eq('id', communityId);
+      }
+
+      toast({
+        title: 'Request Approved',
+        description: 'Member has been added to the community',
+      });
+
+      fetchPendingRequests();
+      fetchCommunities();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to approve request',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeclineRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('community_members')
+        .delete()
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Request Declined',
+        description: 'The join request has been declined',
+      });
+
+      fetchPendingRequests();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to decline request',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const totalMembers = communities.reduce((sum, c) => sum + c.member_count, 0);
   const activeCommunities = communities.filter(c => c.status === 'active').length;
 
@@ -475,7 +570,7 @@ export default function Communities() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -511,7 +606,95 @@ export default function Communities() {
             </div>
           </CardContent>
         </Card>
+
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setRequestsDialogOpen(true)}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-light text-gray-600">Pending Requests</p>
+                <p className="text-2xl font-semibold text-gray-900">{pendingRequests.length}</p>
+              </div>
+              <Clock className="h-8 w-8 text-[#d1242a]" strokeWidth={1.5} />
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {pendingRequests.length > 0 && (
+        <Card className="border-[#d1242a]/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-[#d1242a]" strokeWidth={1.5} />
+                <CardTitle className="text-lg">Pending Join Requests</CardTitle>
+              </div>
+              <Badge variant="destructive" className="bg-[#d1242a]">
+                {pendingRequests.length}
+              </Badge>
+            </div>
+            <CardDescription>Review and approve community join requests</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {pendingRequests.slice(0, 5).map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-[#d1242a]/10 rounded-full flex items-center justify-center">
+                      <Users className="h-5 w-5 text-[#d1242a]" strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {request.memberships?.full_name || 'Unknown'} {request.memberships?.surname || ''}
+                      </p>
+                      <p className="text-xs text-gray-600 font-light">
+                        wants to join <span className="font-medium">{request.community?.name}</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {request.memberships?.region || 'No region'} • {request.memberships?.phone_number || 'No phone'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleApproveRequest(request.id, request.community_id)}
+                      className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                    >
+                      <UserCheck className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeclineRequest(request.id)}
+                      className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                    >
+                      <UserX className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {pendingRequests.length > 5 && (
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setRequestsDialogOpen(true)}
+                >
+                  View All {pendingRequests.length} Requests
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {communities.map((community) => (
@@ -744,6 +927,91 @@ export default function Communities() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={requestsDialogOpen} onOpenChange={setRequestsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>All Pending Join Requests</DialogTitle>
+            <DialogDescription>
+              {pendingRequests.length} {pendingRequests.length === 1 ? 'member' : 'members'} waiting for approval
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {pendingRequests.length === 0 ? (
+              <div className="text-center py-8">
+                <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" strokeWidth={1.5} />
+                <p className="text-gray-600">No pending requests</p>
+                <p className="text-sm text-gray-500 mt-1 font-light">
+                  All join requests have been processed
+                </p>
+              </div>
+            ) : (
+              pendingRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-[#d1242a]/10 rounded-full flex items-center justify-center">
+                      <Users className="h-5 w-5 text-[#d1242a]" strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {request.memberships?.full_name || 'Unknown'} {request.memberships?.surname || ''}
+                      </p>
+                      <p className="text-xs text-gray-600 font-light">
+                        wants to join <span className="font-medium">{request.community?.name}</span>
+                      </p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <p className="text-xs text-gray-500">
+                          {request.memberships?.region || 'No region'}
+                        </p>
+                        {request.memberships?.phone_number && (
+                          <>
+                            <span className="text-xs text-gray-400">•</span>
+                            <p className="text-xs text-gray-500">
+                              {request.memberships.phone_number}
+                            </p>
+                          </>
+                        )}
+                        {request.memberships?.email && (
+                          <>
+                            <span className="text-xs text-gray-400">•</span>
+                            <p className="text-xs text-gray-500">
+                              {request.memberships.email}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleApproveRequest(request.id, request.community_id)}
+                      className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                    >
+                      <UserCheck className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeclineRequest(request.id)}
+                      className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                    >
+                      <UserX className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </DialogContent>
       </Dialog>
