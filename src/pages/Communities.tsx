@@ -666,7 +666,7 @@ export default function Communities() {
             )}
 
             <div className="space-y-2">
-              <Label>Leader Title</Label>
+              <Label>Leader Title <span className="text-xs text-gray-500">(Add custom title)</span></Label>
               <Input
                 value={selectedLeaderTitle}
                 onChange={(e) => setSelectedLeaderTitle(e.target.value)}
