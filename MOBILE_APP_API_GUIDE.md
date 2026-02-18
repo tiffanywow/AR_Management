@@ -416,28 +416,31 @@ Retrieve all communities a user belongs to, including leader information.
 
 ```javascript
 async function getUserCommunities(userId) {
-  const { data, error } = await supabase
+  const { data: memberships, error } = await supabase
     .from('community_members')
-    .select(`
-      *,
-      communities(
-        *,
-        leader:leader_id(
-          id,
-          full_name,
-          phone,
-          memberships(
-            profiles(
-              full_name
-            )
-          )
-        )
-      )
-    `)
-    .eq('user_id', userId);
+    .select('community_id')
+    .eq('user_id', userId)
+    .eq('status', 'active');
 
   if (error) throw error;
-  return data.map(cm => cm.communities);
+
+  if (!memberships || memberships.length === 0) {
+    return [];
+  }
+
+  const communityIds = memberships.map(m => m.community_id);
+
+  const { data: communities, error: commError } = await supabase
+    .from('communities')
+    .select(`
+      *,
+      leader:leader_id(id, full_name, surname, phone_number, email)
+    `)
+    .in('id', communityIds)
+    .eq('status', 'active');
+
+  if (commError) throw commError;
+  return communities || [];
 }
 ```
 
@@ -451,15 +454,14 @@ async function getUserCommunities(userId) {
     "leader_id": "uuid",
     "leader_title": "Chairman",
     "leader_contact": "+264811234567",
+    "member_count": 150,
+    "created_at": "2025-01-15T10:00:00Z",
     "leader": {
       "id": "uuid",
-      "full_name": "John Doe",
-      "phone": "+264811234567",
-      "memberships": {
-        "profiles": {
-          "full_name": "John Doe"
-        }
-      }
+      "full_name": "Werner",
+      "surname": "Alweendo",
+      "phone_number": "+264811234567",
+      "email": "werner@example.com"
     }
   }
 ]
@@ -475,19 +477,10 @@ async function getCommunityDetails(communityId) {
     .from('communities')
     .select(`
       *,
-      leader:leader_id(
-        id,
-        full_name,
-        phone,
-        memberships(
-          profiles(
-            full_name
-          )
-        )
-      )
+      leader:leader_id(id, full_name, surname, phone_number, email)
     `)
     .eq('id', communityId)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
   return data;
@@ -507,15 +500,78 @@ async function getCommunityDetails(communityId) {
   "created_at": "2025-01-15T10:00:00Z",
   "leader": {
     "id": "uuid",
-    "full_name": "John Doe",
-    "phone": "+264811234567",
-    "memberships": {
-      "profiles": {
-        "full_name": "John Doe"
-      }
-    }
+    "full_name": "Werner",
+    "surname": "Alweendo",
+    "phone_number": "+264811234567",
+    "email": "werner@example.com"
   }
 }
+```
+
+### Get All Communities
+
+Retrieve all active communities with leader information (useful for community discovery).
+
+```javascript
+async function getAllCommunities(limit = 50, offset = 0) {
+  const { data, error } = await supabase
+    .from('communities')
+    .select(`
+      *,
+      leader:leader_id(id, full_name, surname, phone_number, email)
+    `)
+    .eq('status', 'active')
+    .eq('privacy_setting', 'public')
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+  return data || [];
+}
+```
+
+**Response Format**:
+```json
+[
+  {
+    "id": "uuid",
+    "name": "Youth Wing",
+    "description": "Community for young members",
+    "community_type": "youth",
+    "privacy_setting": "public",
+    "leader_id": "uuid",
+    "leader_title": "Chairman",
+    "leader_contact": "+264811234567",
+    "member_count": 150,
+    "created_at": "2025-01-15T10:00:00Z",
+    "leader": {
+      "id": "uuid",
+      "full_name": "Werner",
+      "surname": "Alweendo",
+      "phone_number": "+264811234567",
+      "email": "werner@example.com"
+    }
+  },
+  {
+    "id": "uuid",
+    "name": "Women's Network",
+    "description": "Empowering women members",
+    "community_type": "women",
+    "privacy_setting": "public",
+    "leader_id": "uuid",
+    "leader_title": "President",
+    "leader_contact": "+264812345678",
+    "member_count": 200,
+    "created_at": "2025-01-10T10:00:00Z",
+    "leader": {
+      "id": "uuid",
+      "full_name": "Tiffany",
+      "surname": "Nels",
+      "phone_number": "+264812345678",
+      "email": "tiffany@example.com"
+    }
+  }
+]
 ```
 
 ### Get Community Broadcasts
