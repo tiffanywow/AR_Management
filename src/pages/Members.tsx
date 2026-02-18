@@ -1047,7 +1047,7 @@ export default function Members() {
                           </span>
                         </div>
                         <div>
-                          <h2 className="text-2xl font-bold">PARTY NAME</h2>
+                          <h2 className="text-2xl font-bold">AFFIRMATIVE REPOSITIONING</h2>
                           <p className="text-sm opacity-90">Official Member Card</p>
                         </div>
                       </div>
