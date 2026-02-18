@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2 } from 'lucide-react';
+import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +26,16 @@ interface Community {
   status: string | null;
   created_at: string;
   created_by: string | null;
+  leader_id: string | null;
+  leader_title: string | null;
+  leader_contact: string | null;
+  leader?: {
+    id: string;
+    full_name: string;
+    surname: string;
+    phone_number: string;
+    email: string;
+  };
 }
 
 interface CommunityMember {
@@ -46,6 +56,8 @@ export default function Communities() {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [communityMembers, setCommunityMembers] = useState<any[]>([]);
   const [availableMembers, setAvailableMembers] = useState<any[]>([]);
+  const [leaderDialogOpen, setLeaderDialogOpen] = useState(false);
+  const [selectedLeaderTitle, setSelectedLeaderTitle] = useState('Community Leader');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -63,7 +75,10 @@ export default function Communities() {
     try {
       const { data, error } = await supabase
         .from('communities')
-        .select('*')
+        .select(`
+          *,
+          leader:leader_id(id, full_name, surname, phone_number, email)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -257,10 +272,70 @@ export default function Communities() {
     }
   };
 
+  const handleSetLeader = async (communityId: string, leaderId: string, leaderTitle: string) => {
+    try {
+      const { error } = await supabase
+        .from('communities')
+        .update({
+          leader_id: leaderId,
+          leader_title: leaderTitle
+        })
+        .eq('id', communityId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Leader Assigned',
+        description: 'Community leader has been set successfully',
+      });
+
+      fetchCommunities();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to set leader',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRemoveLeader = async (communityId: string) => {
+    try {
+      const { error } = await supabase
+        .from('communities')
+        .update({
+          leader_id: null,
+          leader_title: null
+        })
+        .eq('id', communityId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Leader Removed',
+        description: 'Community leader has been removed',
+      });
+
+      fetchCommunities();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to remove leader',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleViewMembers = (community: Community) => {
     setSelectedCommunity(community);
     fetchCommunityMembers(community.id);
     setMembersDialogOpen(true);
+  };
+
+  const handleOpenLeaderDialog = (community: Community) => {
+    setSelectedCommunity(community);
+    setSelectedLeaderTitle(community.leader_title || 'Community Leader');
+    setLeaderDialogOpen(true);
   };
 
   const totalMembers = communities.reduce((sum, c) => sum + c.member_count, 0);
@@ -425,6 +500,21 @@ export default function Communities() {
                 </p>
               )}
 
+              {community.leader && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
+                    <p className="text-xs font-medium text-gray-700">{community.leader_title || 'Community Leader'}</p>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {community.leader.full_name} {community.leader.surname}
+                  </p>
+                  {community.leader.phone_number && (
+                    <p className="text-xs text-gray-600">{community.leader.phone_number}</p>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -434,6 +524,15 @@ export default function Communities() {
                 >
                   <Users className="mr-2 h-3 w-3" strokeWidth={1.5} />
                   Members
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => handleOpenLeaderDialog(community)}
+                >
+                  <Crown className="mr-2 h-3 w-3" strokeWidth={1.5} />
+                  Leader
                 </Button>
                 <Button
                   size="sm"
@@ -525,6 +624,90 @@ export default function Communities() {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={leaderDialogOpen} onOpenChange={setLeaderDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set Community Leader</DialogTitle>
+            <DialogDescription>Assign a leader for {selectedCommunity?.name}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {selectedCommunity?.leader && (
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
+                    <p className="text-sm font-medium">Current Leader</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedCommunity) {
+                        handleRemoveLeader(selectedCommunity.id);
+                        setLeaderDialogOpen(false);
+                      }
+                    }}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    Remove
+                  </Button>
+                </div>
+                <p className="text-sm font-medium text-gray-900">
+                  {selectedCommunity.leader.full_name} {selectedCommunity.leader.surname}
+                </p>
+                <p className="text-xs text-gray-600">{selectedCommunity.leader_title || 'Community Leader'}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Leader Title</Label>
+              <Select
+                value={selectedLeaderTitle}
+                onValueChange={setSelectedLeaderTitle}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Community Leader">Community Leader</SelectItem>
+                  <SelectItem value="Chairman">Chairman</SelectItem>
+                  <SelectItem value="Chairperson">Chairperson</SelectItem>
+                  <SelectItem value="Coordinator">Coordinator</SelectItem>
+                  <SelectItem value="President">President</SelectItem>
+                  <SelectItem value="Secretary">Secretary</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>Select Member as Leader</Label>
+              <Select
+                onValueChange={(memberId) => {
+                  if (selectedCommunity) {
+                    handleSetLeader(selectedCommunity.id, memberId, selectedLeaderTitle);
+                    setLeaderDialogOpen(false);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.full_name} {member.surname} ({member.region || 'No region'})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </DialogContent>
