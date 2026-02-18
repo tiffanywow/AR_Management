@@ -759,6 +759,21 @@ export default function Members() {
                         </Button>
                       </div>
                     )}
+                    {member.status === 'approved' && member.membership_number && member.membership_number.trim() !== '' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[#d1242a] hover:text-[#b91c1c] hover:bg-[#d1242a]/5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMember(member);
+                          setCardPreviewDialogOpen(true);
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-1" strokeWidth={1.5} />
+                        Download Card
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
