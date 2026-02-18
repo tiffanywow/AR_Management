@@ -69,7 +69,40 @@ export default function Communities() {
   useEffect(() => {
     fetchCommunities();
     fetchAvailableMembers();
-  }, []);
+
+    const communitiesChannel = supabase
+      .channel('communities_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'communities'
+        },
+        () => {
+          fetchCommunities();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_members'
+        },
+        (payload) => {
+          fetchCommunities();
+          if (selectedCommunity) {
+            fetchCommunityMembers(selectedCommunity.id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(communitiesChannel);
+    };
+  }, [selectedCommunity]);
 
   const fetchCommunities = async () => {
     try {
