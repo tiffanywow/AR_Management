@@ -467,9 +467,28 @@ async function getUserCommunities(userId) {
 ]
 ```
 
+**UI Display Recommendation for Community List**:
+
+Each community card in the list should show:
+- Community name and type
+- Member count
+- Leader name and title (if assigned)
+
+Example card:
+```
+┌─────────────────────────────────┐
+│ 👥 Youth Wing                   │
+│ 150 members • Youth             │
+│                                 │
+│ 👑 Chairman: Werner Alweendo   │
+└─────────────────────────────────┘
+```
+
 ### Get Community Details
 
 Retrieve detailed information about a specific community, including the leader.
+
+**IMPORTANT FOR MOBILE APP**: Display the community leader information prominently on the community details page.
 
 ```javascript
 async function getCommunityDetails(communityId) {
@@ -493,11 +512,14 @@ async function getCommunityDetails(communityId) {
   "id": "uuid",
   "name": "Youth Wing",
   "description": "Community for young members",
+  "community_type": "youth",
+  "privacy_setting": "public",
   "leader_id": "uuid",
   "leader_title": "Chairman",
   "leader_contact": "+264811234567",
   "member_count": 150,
   "created_at": "2025-01-15T10:00:00Z",
+  "status": "active",
   "leader": {
     "id": "uuid",
     "full_name": "Werner",
@@ -507,6 +529,38 @@ async function getCommunityDetails(communityId) {
   }
 }
 ```
+
+**UI Display Recommendation for Mobile App**:
+
+The community details page should display the leader section as follows:
+
+```
+┌─────────────────────────────────────┐
+│  Youth Wing                         │
+│  150 members • Public               │
+│                                     │
+│  Description of community...        │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │ 👑 Community Leader         │   │
+│  │                             │   │
+│  │ Chairman                    │   │
+│  │ Werner Alweendo             │   │
+│  │ 📱 +264811234567            │   │
+│  │ ✉️  werner@example.com      │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  [View Members] [View Posts]       │
+└─────────────────────────────────────┘
+```
+
+**Display Logic**:
+- Show leader section ONLY if `leader_id` is not null
+- Display `leader_title` (e.g., "Chairman", "President") if available, otherwise show "Community Leader"
+- Show leader's full name: `${leader.full_name} ${leader.surname}`
+- Display phone number if `leader.phone_number` is not null
+- Display email if `leader.email` is not null
+- The leader section should be visually distinct (e.g., card with light background)
 
 ### Get All Communities
 
