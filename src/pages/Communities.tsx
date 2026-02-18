@@ -667,22 +667,11 @@ export default function Communities() {
 
             <div className="space-y-2">
               <Label>Leader Title</Label>
-              <Select
+              <Input
                 value={selectedLeaderTitle}
-                onValueChange={setSelectedLeaderTitle}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Community Leader">Community Leader</SelectItem>
-                  <SelectItem value="Chairman">Chairman</SelectItem>
-                  <SelectItem value="Chairperson">Chairperson</SelectItem>
-                  <SelectItem value="Coordinator">Coordinator</SelectItem>
-                  <SelectItem value="President">President</SelectItem>
-                  <SelectItem value="Secretary">Secretary</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setSelectedLeaderTitle(e.target.value)}
+                placeholder="e.g., Chairman, Coordinator, President"
+              />
             </div>
 
             <Separator />
