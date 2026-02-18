@@ -683,7 +683,7 @@ export default function Members() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-medium">Membership Applications</CardTitle>
-          <CardDescription>Review and manage party member applications</CardDescription>
+          <CardDescription>Review and manage party member applications ({members.length} members)</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredMembers.length === 0 ? (
