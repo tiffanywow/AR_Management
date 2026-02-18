@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown, UserCheck, UserX, Clock } from 'lucide-react';
@@ -60,6 +61,8 @@ export default function Communities() {
   const [selectedLeaderTitle, setSelectedLeaderTitle] = useState('Community Leader');
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [requestsDialogOpen, setRequestsDialogOpen] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -298,12 +301,19 @@ export default function Communities() {
     }
   };
 
-  const handleRemoveMember = async (membershipId: string) => {
+  const handleRemoveMemberClick = (membershipId: string, memberName: string) => {
+    setMemberToRemove({ id: membershipId, name: memberName });
+    setRemoveConfirmOpen(true);
+  };
+
+  const handleRemoveMember = async () => {
+    if (!memberToRemove) return;
+
     try {
       const { error } = await supabase
         .from('community_members')
         .delete()
-        .eq('id', membershipId);
+        .eq('id', memberToRemove.id);
 
       if (error) throw error;
 
@@ -323,6 +333,9 @@ export default function Communities() {
         fetchCommunityMembers(selectedCommunity.id);
         fetchCommunities();
       }
+
+      setRemoveConfirmOpen(false);
+      setMemberToRemove(null);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -840,7 +853,10 @@ export default function Communities() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveMember(membership.id)}
+                      onClick={() => handleRemoveMemberClick(
+                        membership.id,
+                        `${membership.memberships?.full_name || 'Unknown'} ${membership.memberships?.surname || ''}`
+                      )}
                       className="bg-gray-100 hover:bg-gray-200"
                     >
                       <Trash2 className="h-4 w-4" strokeWidth={1.5} />
@@ -1015,6 +1031,27 @@ export default function Communities() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Member from Community?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <span className="font-medium text-gray-900">{memberToRemove?.name}</span> from this community?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setMemberToRemove(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveMember}
+              className="bg-[#d1242a] hover:bg-[#b01f24]"
+            >
+              Remove Member
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
