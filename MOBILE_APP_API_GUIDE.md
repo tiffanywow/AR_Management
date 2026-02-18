@@ -412,13 +412,27 @@ async function getPollResults(pollId) {
 
 ### Get User Communities
 
+Retrieve all communities a user belongs to, including leader information.
+
 ```javascript
 async function getUserCommunities(userId) {
   const { data, error } = await supabase
     .from('community_members')
     .select(`
       *,
-      communities(*)
+      communities(
+        *,
+        leader:leader_id(
+          id,
+          full_name,
+          phone,
+          memberships(
+            profiles(
+              full_name
+            )
+          )
+        )
+      )
     `)
     .eq('user_id', userId);
 
@@ -427,18 +441,80 @@ async function getUserCommunities(userId) {
 }
 ```
 
+**Response Format**:
+```json
+[
+  {
+    "id": "uuid",
+    "name": "Youth Wing",
+    "description": "Community for young members",
+    "leader_id": "uuid",
+    "leader_title": "Chairman",
+    "leader_contact": "+264811234567",
+    "leader": {
+      "id": "uuid",
+      "full_name": "John Doe",
+      "phone": "+264811234567",
+      "memberships": {
+        "profiles": {
+          "full_name": "John Doe"
+        }
+      }
+    }
+  }
+]
+```
+
 ### Get Community Details
+
+Retrieve detailed information about a specific community, including the leader.
 
 ```javascript
 async function getCommunityDetails(communityId) {
   const { data, error } = await supabase
     .from('communities')
-    .select('*')
+    .select(`
+      *,
+      leader:leader_id(
+        id,
+        full_name,
+        phone,
+        memberships(
+          profiles(
+            full_name
+          )
+        )
+      )
+    `)
     .eq('id', communityId)
     .single();
 
   if (error) throw error;
   return data;
+}
+```
+
+**Response Format**:
+```json
+{
+  "id": "uuid",
+  "name": "Youth Wing",
+  "description": "Community for young members",
+  "leader_id": "uuid",
+  "leader_title": "Chairman",
+  "leader_contact": "+264811234567",
+  "member_count": 150,
+  "created_at": "2025-01-15T10:00:00Z",
+  "leader": {
+    "id": "uuid",
+    "full_name": "John Doe",
+    "phone": "+264811234567",
+    "memberships": {
+      "profiles": {
+        "full_name": "John Doe"
+      }
+    }
+  }
 }
 ```
 
