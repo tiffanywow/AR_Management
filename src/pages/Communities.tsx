@@ -996,7 +996,6 @@ export default function Communities() {
                         membership.isLeader
                       )}
                       className="bg-gray-100 hover:bg-gray-200"
-                      disabled={membership.isLeader}
                     >
                       <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                     </Button>
