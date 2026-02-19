@@ -66,6 +66,8 @@ export default function Communities() {
   const [communityToDelete, setCommunityToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [removeLeaderConfirmOpen, setRemoveLeaderConfirmOpen] = useState(false);
+  const [replaceLeaderConfirmOpen, setReplaceLeaderConfirmOpen] = useState(false);
+  const [newLeaderData, setNewLeaderData] = useState<{ memberId: string; memberName: string } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -1058,8 +1060,16 @@ export default function Communities() {
               <Select
                 onValueChange={(memberId) => {
                   if (selectedCommunity) {
-                    handleSetLeader(selectedCommunity.id, memberId, selectedLeaderTitle);
-                    setLeaderDialogOpen(false);
+                    const selectedMember = availableMembers.find(m => m.id === memberId);
+                    const memberName = selectedMember ? `${selectedMember.full_name} ${selectedMember.surname}` : 'this member';
+
+                    if (selectedCommunity.leader) {
+                      setNewLeaderData({ memberId, memberName });
+                      setReplaceLeaderConfirmOpen(true);
+                    } else {
+                      handleSetLeader(selectedCommunity.id, memberId, selectedLeaderTitle);
+                      setLeaderDialogOpen(false);
+                    }
                   }
                 }}
               >
@@ -1239,6 +1249,38 @@ export default function Communities() {
               className="bg-[#d1242a] hover:bg-[#b01f24]"
             >
               Remove Leader
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={replaceLeaderConfirmOpen} onOpenChange={setReplaceLeaderConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace Community Leader?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to replace the current leader <span className="font-medium text-gray-900">
+                {selectedCommunity?.leader?.full_name} {selectedCommunity?.leader?.surname}
+              </span> with <span className="font-medium text-gray-900">{newLeaderData?.memberName}</span>?
+              <span className="block mt-2">
+                This will update the leader assignment for <span className="font-medium text-gray-900">{selectedCommunity?.name}</span>.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setNewLeaderData(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedCommunity && newLeaderData) {
+                  handleSetLeader(selectedCommunity.id, newLeaderData.memberId, selectedLeaderTitle);
+                  setReplaceLeaderConfirmOpen(false);
+                  setLeaderDialogOpen(false);
+                  setNewLeaderData(null);
+                }
+              }}
+              className="bg-[#d1242a] hover:bg-[#b01f24]"
+            >
+              Replace Leader
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
