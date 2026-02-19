@@ -386,7 +386,7 @@ export default function Communities() {
         };
 
         if (memberToRemove.isLeader) {
-          updates.leader_membership_id = null;
+          updates.leader_id = null;
           updates.leader_title = null;
         }
 
