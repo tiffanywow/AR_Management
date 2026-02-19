@@ -1030,12 +1030,14 @@ export default function Communities() {
                     <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
                     <p className="text-sm font-medium">Current Leader</p>
                   </div>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setRemoveLeaderConfirmOpen(true)}
-                    className="text-xs text-red-600 hover:text-red-700 font-light underline underline-offset-2 transition-colors"
+                    className="bg-gray-100 hover:bg-gray-200"
                   >
-                    Remove
-                  </button>
+                    <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                  </Button>
                 </div>
                 <p className="text-sm font-medium text-gray-900">
                   {selectedCommunity.leader.full_name} {selectedCommunity.leader.surname}
