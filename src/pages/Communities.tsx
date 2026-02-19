@@ -178,6 +178,32 @@ export default function Communities() {
         })
       );
 
+      if (community?.leader_id) {
+        const leaderExists = membersWithDetails.some(m => m.user_id === community.leader_id);
+
+        if (!leaderExists) {
+          const { data: leaderData } = await supabase
+            .from('memberships')
+            .select('id, user_id, full_name, surname, email, region')
+            .eq('user_id', community.leader_id)
+            .maybeSingle();
+
+          if (leaderData) {
+            membersWithDetails.unshift({
+              id: `leader-${community.leader_id}`,
+              community_id: communityId,
+              user_id: community.leader_id,
+              role: 'member',
+              status: 'active',
+              joined_at: new Date().toISOString(),
+              memberships: leaderData,
+              isLeader: true,
+              leaderTitle: community.leader_title || 'Community Leader'
+            });
+          }
+        }
+      }
+
       const sortedMembers = membersWithDetails.sort((a, b) => {
         if (a.isLeader) return -1;
         if (b.isLeader) return 1;
@@ -317,7 +343,15 @@ export default function Communities() {
     }
   };
 
-  const handleRemoveMemberClick = (membershipId: string, memberName: string) => {
+  const handleRemoveMemberClick = (membershipId: string, memberName: string, isLeader: boolean = false) => {
+    if (isLeader) {
+      toast({
+        title: 'Cannot Remove Leader',
+        description: 'Community leaders must be unassigned before removal. Please remove the leader assignment first.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setMemberToRemove({ id: membershipId, name: memberName });
     setRemoveConfirmOpen(true);
   };
@@ -922,9 +956,11 @@ export default function Communities() {
                       size="sm"
                       onClick={() => handleRemoveMemberClick(
                         membership.id,
-                        `${membership.memberships?.full_name || 'Unknown'} ${membership.memberships?.surname || ''}`
+                        `${membership.memberships?.full_name || 'Unknown'} ${membership.memberships?.surname || ''}`,
+                        membership.isLeader
                       )}
                       className="bg-gray-100 hover:bg-gray-200"
+                      disabled={membership.isLeader}
                     >
                       <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                     </Button>
