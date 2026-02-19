@@ -147,6 +147,12 @@ export default function Communities() {
 
   const fetchCommunityMembers = async (communityId: string) => {
     try {
+      const { data: community } = await supabase
+        .from('communities')
+        .select('leader_id, leader_title')
+        .eq('id', communityId)
+        .maybeSingle();
+
       const { data: members, error } = await supabase
         .from('community_members')
         .select('*')
@@ -165,12 +171,20 @@ export default function Communities() {
 
           return {
             ...member,
-            memberships: membershipData
+            memberships: membershipData,
+            isLeader: community?.leader_id === member.user_id,
+            leaderTitle: community?.leader_title || 'Community Leader'
           };
         })
       );
 
-      setCommunityMembers(membersWithDetails);
+      const sortedMembers = membersWithDetails.sort((a, b) => {
+        if (a.isLeader) return -1;
+        if (b.isLeader) return 1;
+        return 0;
+      });
+
+      setCommunityMembers(sortedMembers);
     } catch (error) {
       console.error('Error fetching community members:', error);
     }
@@ -382,6 +396,37 @@ export default function Communities() {
 
   const handleSetLeader = async (communityId: string, leaderId: string, leaderTitle: string) => {
     try {
+      const { data: existingMember } = await supabase
+        .from('community_members')
+        .select('id')
+        .eq('community_id', communityId)
+        .eq('user_id', leaderId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      const isNewMember = !existingMember;
+
+      if (isNewMember) {
+        const { error: memberError } = await supabase
+          .from('community_members')
+          .insert({
+            community_id: communityId,
+            user_id: leaderId,
+            role: 'member',
+            status: 'active'
+          });
+
+        if (memberError) throw memberError;
+
+        const community = communities.find(c => c.id === communityId);
+        if (community) {
+          await supabase
+            .from('communities')
+            .update({ member_count: community.member_count + 1 })
+            .eq('id', communityId);
+        }
+      }
+
       const { error } = await supabase
         .from('communities')
         .update({
@@ -398,6 +443,9 @@ export default function Communities() {
       });
 
       fetchCommunities();
+      if (selectedCommunity) {
+        fetchCommunityMembers(selectedCommunity.id);
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -852,10 +900,18 @@ export default function Communities() {
                           {membership.memberships?.full_name?.charAt(0) || '?'}
                         </span>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {membership.memberships?.full_name || 'Unknown'} {membership.memberships?.surname || ''}
-                        </p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            {membership.memberships?.full_name || 'Unknown'} {membership.memberships?.surname || ''}
+                          </p>
+                          {membership.isLeader && (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-[#d1242a] text-white rounded-full flex items-center gap-1">
+                              <Crown className="h-3 w-3" strokeWidth={2} />
+                              {membership.leaderTitle}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-500 font-light">
                           {membership.memberships?.region || 'No region'} • {membership.role}
                         </p>
