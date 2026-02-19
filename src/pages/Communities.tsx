@@ -161,6 +161,17 @@ export default function Communities() {
 
       if (error) throw error;
 
+      let leaderUserId = null;
+      if (community?.leader_id) {
+        const { data: leaderMembership } = await supabase
+          .from('memberships')
+          .select('user_id')
+          .eq('id', community.leader_id)
+          .maybeSingle();
+
+        leaderUserId = leaderMembership?.user_id;
+      }
+
       const membersWithDetails = await Promise.all(
         (members || []).map(async (member) => {
           const { data: membershipData } = await supabase
@@ -172,50 +183,27 @@ export default function Communities() {
           return {
             ...member,
             memberships: membershipData,
-            isLeader: community?.leader_id === member.user_id,
+            isLeader: leaderUserId === member.user_id,
             leaderTitle: community?.leader_title || 'Community Leader'
           };
         })
       );
 
-      if (community?.leader_id) {
-        const leaderExists = membersWithDetails.some(m => m.user_id === community.leader_id);
+      if (leaderUserId) {
+        const leaderExists = membersWithDetails.some(m => m.user_id === leaderUserId);
 
         if (!leaderExists) {
-          let leaderData = null;
-
-          const { data: membershipData } = await supabase
+          const { data: leaderData } = await supabase
             .from('memberships')
             .select('id, user_id, full_name, surname, email, region')
-            .eq('user_id', community.leader_id)
+            .eq('user_id', leaderUserId)
             .maybeSingle();
-
-          if (membershipData) {
-            leaderData = membershipData;
-          } else {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('id, full_name, email, region')
-              .eq('id', community.leader_id)
-              .maybeSingle();
-
-            if (profileData) {
-              leaderData = {
-                id: profileData.id,
-                user_id: profileData.id,
-                full_name: profileData.full_name,
-                surname: '',
-                email: profileData.email,
-                region: profileData.region
-              };
-            }
-          }
 
           if (leaderData) {
             membersWithDetails.unshift({
-              id: `leader-${community.leader_id}`,
+              id: `leader-${leaderUserId}`,
               community_id: communityId,
-              user_id: community.leader_id,
+              user_id: leaderUserId,
               role: 'member',
               status: 'active',
               joined_at: new Date().toISOString(),
@@ -323,13 +311,23 @@ export default function Communities() {
     }
   };
 
-  const handleAddMemberToCommunity = async (memberId: string) => {
+  const handleAddMemberToCommunity = async (membershipId: string) => {
     if (!selectedCommunity || !user) return;
 
     try {
+      const { data: membership } = await supabase
+        .from('memberships')
+        .select('user_id')
+        .eq('id', membershipId)
+        .maybeSingle();
+
+      if (!membership) {
+        throw new Error('Member not found');
+      }
+
       const { error } = await supabase.from('community_members').insert([{
         community_id: selectedCommunity.id,
-        user_id: memberId,
+        user_id: membership.user_id,
         role: 'member',
         status: 'active',
         invited_by: user.id,
@@ -451,13 +449,25 @@ export default function Communities() {
     }
   };
 
-  const handleSetLeader = async (communityId: string, leaderId: string, leaderTitle: string) => {
+  const handleSetLeader = async (communityId: string, membershipId: string, leaderTitle: string) => {
     try {
+      const { data: membership } = await supabase
+        .from('memberships')
+        .select('user_id')
+        .eq('id', membershipId)
+        .maybeSingle();
+
+      if (!membership) {
+        throw new Error('Member not found');
+      }
+
+      const userId = membership.user_id;
+
       const { data: existingMember } = await supabase
         .from('community_members')
         .select('id')
         .eq('community_id', communityId)
-        .eq('user_id', leaderId)
+        .eq('user_id', userId)
         .eq('status', 'active')
         .maybeSingle();
 
@@ -468,7 +478,7 @@ export default function Communities() {
           .from('community_members')
           .insert({
             community_id: communityId,
-            user_id: leaderId,
+            user_id: userId,
             role: 'member',
             status: 'active'
           });
@@ -487,7 +497,7 @@ export default function Communities() {
       const { error } = await supabase
         .from('communities')
         .update({
-          leader_id: leaderId,
+          leader_id: membershipId,
           leader_title: leaderTitle
         })
         .eq('id', communityId);
@@ -933,7 +943,7 @@ export default function Communities() {
                   {availableMembers
                     .filter(m => !communityMembers.find(cm => cm.user_id === m.user_id))
                     .map((member) => (
-                      <SelectItem key={member.id} value={member.user_id}>
+                      <SelectItem key={member.id} value={member.id}>
                         {member.full_name} {member.surname} ({member.region || 'No region'})
                       </SelectItem>
                     ))}
@@ -1062,7 +1072,7 @@ export default function Communities() {
                 </SelectTrigger>
                 <SelectContent>
                   {availableMembers.map((member) => (
-                    <SelectItem key={member.id} value={member.user_id}>
+                    <SelectItem key={member.id} value={member.id}>
                       {member.full_name} {member.surname} ({member.region || 'No region'})
                     </SelectItem>
                   ))}
