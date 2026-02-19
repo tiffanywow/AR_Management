@@ -63,6 +63,8 @@ export default function Communities() {
   const [requestsDialogOpen, setRequestsDialogOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [communityToDelete, setCommunityToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -345,12 +347,19 @@ export default function Communities() {
     }
   };
 
-  const handleDeleteCommunity = async (communityId: string) => {
+  const handleDeleteCommunityClick = (communityId: string, communityName: string) => {
+    setCommunityToDelete({ id: communityId, name: communityName });
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteCommunity = async () => {
+    if (!communityToDelete) return;
+
     try {
       const { error } = await supabase
         .from('communities')
         .delete()
-        .eq('id', communityId);
+        .eq('id', communityToDelete.id);
 
       if (error) throw error;
 
@@ -360,6 +369,8 @@ export default function Communities() {
       });
 
       fetchCommunities();
+      setDeleteConfirmOpen(false);
+      setCommunityToDelete(null);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -728,7 +739,7 @@ export default function Communities() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleDeleteCommunity(community.id)}
+                  onClick={() => handleDeleteCommunityClick(community.id, community.name)}
                   className="bg-gray-100 hover:bg-gray-200"
                 >
                   <Trash2 className="h-4 w-4" strokeWidth={1.5} />
@@ -1048,6 +1059,27 @@ export default function Communities() {
               className="bg-[#d1242a] hover:bg-[#b01f24]"
             >
               Remove Member
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Community?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-medium text-gray-900">{communityToDelete?.name}</span>?
+              This will remove all members and community data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCommunityToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCommunity}
+              className="bg-[#d1242a] hover:bg-[#b01f24]"
+            >
+              Delete Community
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
