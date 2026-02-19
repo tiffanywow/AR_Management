@@ -65,6 +65,7 @@ export default function Communities() {
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [communityToDelete, setCommunityToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [removeLeaderConfirmOpen, setRemoveLeaderConfirmOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -1027,19 +1028,12 @@ export default function Communities() {
                     <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
                     <p className="text-sm font-medium">Current Leader</p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (selectedCommunity) {
-                        handleRemoveLeader(selectedCommunity.id);
-                        setLeaderDialogOpen(false);
-                      }
-                    }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  <button
+                    onClick={() => setRemoveLeaderConfirmOpen(true)}
+                    className="text-xs text-red-600 hover:text-red-700 font-light underline underline-offset-2 transition-colors"
                   >
                     Remove
-                  </Button>
+                  </button>
                 </div>
                 <p className="text-sm font-medium text-gray-900">
                   {selectedCommunity.leader.full_name} {selectedCommunity.leader.surname}
@@ -1214,6 +1208,37 @@ export default function Communities() {
               className="bg-[#d1242a] hover:bg-[#b01f24]"
             >
               Delete Community
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={removeLeaderConfirmOpen} onOpenChange={setRemoveLeaderConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Community Leader?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <span className="font-medium text-gray-900">
+                {selectedCommunity?.leader?.full_name} {selectedCommunity?.leader?.surname}
+              </span> as the community leader?
+              <span className="block mt-2">
+                This will clear the leader assignment for <span className="font-medium text-gray-900">{selectedCommunity?.name}</span>.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedCommunity) {
+                  handleRemoveLeader(selectedCommunity.id);
+                  setRemoveLeaderConfirmOpen(false);
+                  setLeaderDialogOpen(false);
+                }
+              }}
+              className="bg-[#d1242a] hover:bg-[#b01f24]"
+            >
+              Remove Leader
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
