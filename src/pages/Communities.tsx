@@ -182,11 +182,34 @@ export default function Communities() {
         const leaderExists = membersWithDetails.some(m => m.user_id === community.leader_id);
 
         if (!leaderExists) {
-          const { data: leaderData } = await supabase
+          let leaderData = null;
+
+          const { data: membershipData } = await supabase
             .from('memberships')
             .select('id, user_id, full_name, surname, email, region')
             .eq('user_id', community.leader_id)
             .maybeSingle();
+
+          if (membershipData) {
+            leaderData = membershipData;
+          } else {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('id, full_name, email, region')
+              .eq('id', community.leader_id)
+              .maybeSingle();
+
+            if (profileData) {
+              leaderData = {
+                id: profileData.id,
+                user_id: profileData.id,
+                full_name: profileData.full_name,
+                surname: '',
+                email: profileData.email,
+                region: profileData.region
+              };
+            }
+          }
 
           if (leaderData) {
             membersWithDetails.unshift({
@@ -1039,7 +1062,7 @@ export default function Communities() {
                 </SelectTrigger>
                 <SelectContent>
                   {availableMembers.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
+                    <SelectItem key={member.id} value={member.user_id}>
                       {member.full_name} {member.surname} ({member.region || 'No region'})
                     </SelectItem>
                   ))}
