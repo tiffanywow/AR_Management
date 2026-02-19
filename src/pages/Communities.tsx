@@ -61,7 +61,7 @@ export default function Communities() {
   const [selectedLeaderTitle, setSelectedLeaderTitle] = useState('Community Leader');
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [requestsDialogOpen, setRequestsDialogOpen] = useState(false);
-  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string; isLeader: boolean } | null>(null);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [communityToDelete, setCommunityToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -365,15 +365,7 @@ export default function Communities() {
   };
 
   const handleRemoveMemberClick = (membershipId: string, memberName: string, isLeader: boolean = false) => {
-    if (isLeader) {
-      toast({
-        title: 'Cannot Remove Leader',
-        description: 'Community leaders must be unassigned before removal. Please remove the leader assignment first.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setMemberToRemove({ id: membershipId, name: memberName });
+    setMemberToRemove({ id: membershipId, name: memberName, isLeader });
     setRemoveConfirmOpen(true);
   };
 
@@ -389,15 +381,26 @@ export default function Communities() {
       if (error) throw error;
 
       if (selectedCommunity) {
+        const updates: any = {
+          member_count: Math.max(0, selectedCommunity.member_count - 1)
+        };
+
+        if (memberToRemove.isLeader) {
+          updates.leader_membership_id = null;
+          updates.leader_title = null;
+        }
+
         await supabase
           .from('communities')
-          .update({ member_count: Math.max(0, selectedCommunity.member_count - 1) })
+          .update(updates)
           .eq('id', selectedCommunity.id);
       }
 
       toast({
         title: 'Member Removed',
-        description: 'Member has been removed from the community',
+        description: memberToRemove.isLeader
+          ? 'Community leader has been removed from the community'
+          : 'Member has been removed from the community',
       });
 
       if (selectedCommunity) {
@@ -1171,10 +1174,17 @@ export default function Communities() {
       <AlertDialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Member from Community?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {memberToRemove?.isLeader ? 'Remove Community Leader?' : 'Remove Member from Community?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to remove <span className="font-medium text-gray-900">{memberToRemove?.name}</span> from this community?
-              This action cannot be undone.
+              {memberToRemove?.isLeader && (
+                <span className="block mt-2 text-amber-600 font-medium">
+                  This member is currently the community leader. Removing them will also clear the leader assignment.
+                </span>
+              )}
+              <span className="block mt-2">This action cannot be undone.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1183,7 +1193,7 @@ export default function Communities() {
               onClick={handleRemoveMember}
               className="bg-[#d1242a] hover:bg-[#b01f24]"
             >
-              Remove Member
+              Remove {memberToRemove?.isLeader ? 'Leader' : 'Member'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
