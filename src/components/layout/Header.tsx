@@ -2,6 +2,7 @@ import { Search, User, LogOut, ShieldAlert, Loader } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSearch } from '@/hooks/useSearch';
 import { SearchResult } from '@/lib/searchService';
 import {
@@ -18,6 +19,7 @@ import NotificationsDropdown from './NotificationsDropdown';
 export default function Header() {
   const { profile, signOut, devRoleOverride, setDevRoleOverride } = useAuth();
   const { search, searchResults, isSearching, initialized } = useSearch();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +66,34 @@ export default function Header() {
     }
   };
 
+  const handleResultClick = (result: SearchResult) => {
+    setShowSearchResults(false);
+    setSearchQuery('');
+
+    switch (result.type) {
+      case 'campaign':
+        navigate(`/campaigns/${result.id}`);
+        break;
+      case 'broadcast':
+        navigate('/broadcasting');
+        break;
+      case 'member':
+        navigate('/members');
+        break;
+      case 'community':
+        navigate('/communities');
+        break;
+      case 'poll':
+        navigate('/polls');
+        break;
+      case 'advert':
+        navigate('/adverts');
+        break;
+      default:
+        console.warn('Unknown result type:', result.type);
+    }
+  };
+
   const roles = [
     { value: 'super_admin', label: 'Super Admin' },
     { value: 'administrator', label: 'Administrator' },
@@ -106,10 +136,10 @@ export default function Header() {
                 ) : (
                   <div className="divide-y">
                     {searchResults.slice(0, 8).map((result) => (
-                      <a
+                      <button
                         key={`${result.type}-${result.id}`}
-                        href={`/${result.type}s/${result.id}`}
-                        className="px-4 py-2 hover:bg-gray-50 transition-colors block"
+                        onClick={() => handleResultClick(result)}
+                        className="px-4 py-2 hover:bg-gray-50 transition-colors block w-full text-left"
                       >
                         <div className="flex items-start gap-3">
                           <span className="text-xl flex-shrink-0">{getTypeIcon(result.type)}</span>
@@ -130,7 +160,7 @@ export default function Header() {
                             </div>
                           </div>
                         </div>
-                      </a>
+                      </button>
                     ))}
                     {searchResults.length > 8 && (
                       <div className="px-4 py-2 text-center text-xs text-gray-500">

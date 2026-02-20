@@ -50,19 +50,19 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   const fetchNotifications = useCallback(async () => {
-    if (!profile?.id) {
-      console.log('No profile ID available for fetching notifications');
+    if (!profile?.email) {
+      console.log('No profile email available for fetching notifications');
       return;
     }
 
     setLoading(true);
     try {
-      console.log('Fetching notifications for user:', profile.id);
-      
+      console.log('Fetching notifications for user:', profile.email);
+
       const { data, error } = await supabase
-        .from('push_notifications')
+        .from('notifications')
         .select('*')
-        .eq('user_id', profile.id)
+        .eq('user_id', profile.email)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -72,8 +72,23 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
       }
 
       console.log('Fetched notifications:', data?.length || 0);
-      setNotifications(data || []);
-      setUnreadCount((data || []).filter(n => !n.is_read).length);
+
+      const mappedData = (data || []).map(n => ({
+        id: n.id,
+        user_id: n.user_id,
+        notification_type: n.type,
+        title: n.title,
+        body: n.message,
+        data: n.data,
+        related_id: n.data?.related_id || null,
+        is_read: n.is_read,
+        read_at: n.read_at,
+        sent_at: n.created_at,
+        created_at: n.created_at,
+      }));
+
+      setNotifications(mappedData);
+      setUnreadCount(mappedData.filter(n => !n.is_read).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       setNotifications([]);
@@ -81,12 +96,12 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
     } finally {
       setLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile?.email]);
 
   const markAsRead = async (notificationId: string) => {
     try {
       const { error } = await supabase
-        .from('push_notifications')
+        .from('notifications')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('id', notificationId);
 
@@ -102,13 +117,13 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   };
 
   const markAllAsRead = async () => {
-    if (!profile?.id) return;
+    if (!profile?.email) return;
 
     try {
       const { error } = await supabase
-        .from('push_notifications')
+        .from('notifications')
         .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('user_id', profile.id)
+        .eq('user_id', profile.email)
         .eq('is_read', false);
 
       if (error) throw error;
@@ -128,7 +143,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   }, [onNotificationPopup]);
 
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.email) return;
 
     fetchNotifications();
 
@@ -137,18 +152,32 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
     const setupSubscription = async () => {
       try {
         notificationChannel = supabase
-          .channel(`notifications:${profile.id}`)
+          .channel(`notifications:${profile.email}`)
           .on(
             'postgres_changes',
             {
               event: 'INSERT',
               schema: 'public',
-              table: 'push_notifications',
-              filter: `user_id=eq.${profile.id}`,
+              table: 'notifications',
+              filter: `user_id=eq.${profile.email}`,
             },
             (payload) => {
               console.log('New notification received:', payload.new);
-              const newNotification = payload.new as Notification;
+              const rawNotification = payload.new as any;
+
+              const newNotification: Notification = {
+                id: rawNotification.id,
+                user_id: rawNotification.user_id,
+                notification_type: rawNotification.type,
+                title: rawNotification.title,
+                body: rawNotification.message,
+                data: rawNotification.data,
+                related_id: rawNotification.data?.related_id || null,
+                is_read: rawNotification.is_read,
+                read_at: rawNotification.read_at,
+                sent_at: rawNotification.created_at,
+                created_at: rawNotification.created_at,
+              };
 
               setNotifications(prev => [newNotification, ...prev]);
               setUnreadCount(prev => prev + 1);
@@ -161,12 +190,26 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
             {
               event: 'UPDATE',
               schema: 'public',
-              table: 'push_notifications',
-              filter: `user_id=eq.${profile.id}`,
+              table: 'notifications',
+              filter: `user_id=eq.${profile.email}`,
             },
             (payload) => {
               console.log('Notification updated:', payload.new);
-              const updatedNotification = payload.new as Notification;
+              const rawNotification = payload.new as any;
+
+              const updatedNotification: Notification = {
+                id: rawNotification.id,
+                user_id: rawNotification.user_id,
+                notification_type: rawNotification.type,
+                title: rawNotification.title,
+                body: rawNotification.message,
+                data: rawNotification.data,
+                related_id: rawNotification.data?.related_id || null,
+                is_read: rawNotification.is_read,
+                read_at: rawNotification.read_at,
+                sent_at: rawNotification.created_at,
+                created_at: rawNotification.created_at,
+              };
 
               setNotifications(prev =>
                 prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
@@ -195,7 +238,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         console.log('Notification channel cleaned up');
       }
     };
-  }, [profile?.id, showPopup, fetchNotifications]);
+  }, [profile?.email, showPopup, fetchNotifications]);
 
   return (
     <NotificationContext.Provider
