@@ -50,10 +50,15 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   const fetchNotifications = useCallback(async () => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+      console.log('No profile ID available for fetching notifications');
+      return;
+    }
 
     setLoading(true);
     try {
+      console.log('Fetching notifications for user:', profile.id);
+      
       const { data, error } = await supabase
         .from('push_notifications')
         .select('*')
@@ -61,12 +66,18 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error fetching notifications:', error);
+        throw error;
+      }
 
+      console.log('Fetched notifications:', data?.length || 0);
       setNotifications(data || []);
       setUnreadCount((data || []).filter(n => !n.is_read).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setNotifications([]);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }
@@ -121,55 +132,70 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
 
     fetchNotifications();
 
-    const notificationChannel = supabase
-      .channel(`notifications:${profile.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'push_notifications',
-          filter: `user_id=eq.${profile.id}`,
-        },
-        (payload) => {
-          const newNotification = payload.new as Notification;
+    let notificationChannel: RealtimeChannel | null = null;
 
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
+    const setupSubscription = async () => {
+      try {
+        notificationChannel = supabase
+          .channel(`notifications:${profile.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'push_notifications',
+              filter: `user_id=eq.${profile.id}`,
+            },
+            (payload) => {
+              console.log('New notification received:', payload.new);
+              const newNotification = payload.new as Notification;
 
-          showPopup(newNotification);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'push_notifications',
-          filter: `user_id=eq.${profile.id}`,
-        },
-        (payload) => {
-          const updatedNotification = payload.new as Notification;
+              setNotifications(prev => [newNotification, ...prev]);
+              setUnreadCount(prev => prev + 1);
 
-          setNotifications(prev =>
-            prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
-          );
+              showPopup(newNotification);
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'push_notifications',
+              filter: `user_id=eq.${profile.id}`,
+            },
+            (payload) => {
+              console.log('Notification updated:', payload.new);
+              const updatedNotification = payload.new as Notification;
 
-          if (updatedNotification.is_read) {
-            setUnreadCount(prev => Math.max(0, prev - 1));
-          }
-        }
-      )
-      .subscribe();
+              setNotifications(prev =>
+                prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
+              );
 
-    setChannel(notificationChannel);
+              if (updatedNotification.is_read) {
+                setUnreadCount(prev => Math.max(0, prev - 1));
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log('Subscription status:', status);
+          });
 
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+        setChannel(notificationChannel);
+      } catch (error) {
+        console.error('Error setting up notification subscription:', error);
       }
     };
-  }, [profile?.id, showPopup]);
+
+    setupSubscription();
+
+    return () => {
+      if (notificationChannel) {
+        supabase.removeChannel(notificationChannel);
+        console.log('Notification channel cleaned up');
+      }
+    };
+  }, [profile?.id, showPopup, fetchNotifications]);
 
   return (
     <NotificationContext.Provider

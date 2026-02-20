@@ -7,7 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateNotification } from '@/hooks/useCreateNotification';
+import { debugNotifications, getNotificationStats, createTestNotification } from '@/lib/notificationUtils';
 import { toast } from 'sonner';
+
+interface DebugInfo {
+  userId?: string;
+  userEmail?: string;
+  profile?: any;
+  notifications?: any[];
+  notificationCount?: number;
+}
 
 export default function NotificationTest() {
   const { profile } = useAuth();
@@ -17,6 +26,9 @@ export default function NotificationTest() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const handleSendTestNotification = async () => {
     if (!profile?.id) {
@@ -71,6 +83,55 @@ export default function NotificationTest() {
       toast.error('Failed to send notification');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleDebugNotifications = async () => {
+    setLoading(true);
+    try {
+      const result = await debugNotifications();
+      if (result.success) {
+        setDebugInfo(result.debug);
+        toast.success('Debug info retrieved - check the console');
+      } else {
+        toast.error(result.error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGetStats = async () => {
+    setLoading(true);
+    try {
+      const result = await getNotificationStats();
+      if (result.success) {
+        setStats(result.stats);
+        toast.success('Stats retrieved');
+      } else {
+        toast.error(result.error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateTestNotification = async () => {
+    if (!profile?.id) {
+      toast.error('You must be logged in');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await createTestNotification(profile.id);
+      if (result.success) {
+        toast.success('Test notification created!');
+      } else {
+        toast.error(result.error);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -199,6 +260,79 @@ export default function NotificationTest() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader>
+          <CardTitle className="text-blue-900">🔧 Debug Notifications</CardTitle>
+          <CardDescription>Troubleshoot notification issues</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              onClick={handleDebugNotifications}
+              disabled={loading}
+              variant="outline"
+              className="border-blue-300"
+            >
+              {loading ? 'Loading...' : '📊 Debug Info'}
+            </Button>
+            <Button
+              onClick={handleGetStats}
+              disabled={loading}
+              variant="outline"
+              className="border-blue-300"
+            >
+              {loading ? 'Loading...' : '📈 Get Statistics'}
+            </Button>
+            <Button
+              onClick={handleCreateTestNotification}
+              disabled={loading}
+              variant="outline"
+              className="border-blue-300"
+            >
+              {loading ? 'Loading...' : '✅ Create Direct Test'}
+            </Button>
+          </div>
+
+          {stats && (
+            <div className="bg-white p-4 rounded border border-blue-200">
+              <h4 className="font-semibold mb-2 text-blue-900">Notification Statistics</h4>
+              <ul className="text-sm space-y-1">
+                <li>Total Notifications: <strong>{stats.totalNotifications}</strong></li>
+                <li>Your Notifications: <strong>{stats.userNotifications}</strong></li>
+                <li>Unread Count: <strong>{stats.unreadNotifications}</strong></li>
+                <li>Your ID: <code className="text-xs bg-gray-100 px-2 py-1 rounded">{stats.userId}</code></li>
+              </ul>
+            </div>
+          )}
+
+          {debugInfo && (
+            <div className="bg-white p-4 rounded border border-blue-200 max-h-96 overflow-y-auto">
+              <h4 className="font-semibold mb-2 text-blue-900">Debug Information</h4>
+              <div className="text-sm space-y-2">
+                <p>User ID: <code className="text-xs bg-gray-100 px-2 py-1 rounded">{debugInfo.userId}</code></p>
+                <p>Email: <code className="text-xs bg-gray-100 px-2 py-1 rounded">{debugInfo.userEmail}</code></p>
+                <p>Profile Active: <strong>{debugInfo.profile?.is_active ? '✅ Yes' : '❌ No'}</strong></p>
+                <p>Notifications Found: <strong>{debugInfo.notificationCount || 0}</strong></p>
+                {debugInfo.notifications && debugInfo.notifications.length > 0 && (
+                  <div className="mt-2">
+                    <p className="font-semibold">Recent Notifications:</p>
+                    <div className="space-y-1 mt-1">
+                      {debugInfo.notifications.slice(0, 5).map((notif: any) => (
+                        <div key={notif.id} className="text-xs bg-gray-50 p-2 rounded border">
+                          <p><strong>{notif.title}</strong> - {notif.notification_type}</p>
+                          <p className="text-gray-600">{notif.body}</p>
+                          <p className="text-gray-400">Read: {notif.is_read ? '✅' : '❌'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
