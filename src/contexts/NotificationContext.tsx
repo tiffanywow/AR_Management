@@ -50,18 +50,18 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   const fetchNotifications = useCallback(async () => {
-    if (!profile?.email) {
-      console.log('No profile email available for fetching notifications');
+    if (!profile?.id) {
+      console.log('No profile ID available for fetching notifications');
       return;
     }
 
     setLoading(true);
     try {
-      console.log('Fetching notifications for user:', profile.email);
+      console.log('Fetching notifications for user:', profile.id);
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', profile.email)
+        .eq('user_id', profile.id)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -76,7 +76,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         title: n.title,
         body: n.message,
         data: n.data,
-        related_id: n.data?.related_id || null,
+        related_id: n.related_id || null,
         is_read: n.is_read,
         read_at: n.read_at,
         sent_at: n.created_at,
@@ -90,7 +90,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
     } finally {
       setLoading(false);
     }
-  }, [profile?.email]);
+  }, [profile?.id]);
 
   const markAsRead = async (notificationId: string) => {
     try {
@@ -111,13 +111,13 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   };
 
   const markAllAsRead = async () => {
-    if (!profile?.email) return;
+    if (!profile?.id) return;
 
     try {
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('user_id', profile.email)
+        .eq('user_id', profile.id)
         .eq('is_read', false);
 
       if (error) throw error;
@@ -137,7 +137,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   }, [onNotificationPopup]);
 
   useEffect(() => {
-    if (!profile?.email) return;
+    if (!profile?.id) return;
 
     fetchNotifications();
 
@@ -148,11 +148,24 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'push_notifications',
+          table: 'notifications',
           filter: `user_id=eq.${profile.id}`,
         },
         (payload) => {
-          const newNotification = payload.new as Notification;
+          const rawNotification = payload.new as any;
+          const newNotification: Notification = {
+            id: rawNotification.id,
+            user_id: rawNotification.user_id,
+            notification_type: rawNotification.type,
+            title: rawNotification.title,
+            body: rawNotification.message,
+            data: rawNotification.data,
+            related_id: rawNotification.related_id || null,
+            is_read: rawNotification.is_read,
+            read_at: rawNotification.read_at,
+            sent_at: rawNotification.created_at,
+            created_at: rawNotification.created_at,
+          };
 
           setNotifications(prev => [newNotification, ...prev]);
           setUnreadCount(prev => prev + 1);
@@ -166,10 +179,23 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
           event: 'UPDATE',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${profile.email}`,
+          filter: `user_id=eq.${profile.id}`,
         },
         (payload) => {
-          const updatedNotification = payload.new as Notification;
+          const rawNotification = payload.new as any;
+          const updatedNotification: Notification = {
+            id: rawNotification.id,
+            user_id: rawNotification.user_id,
+            notification_type: rawNotification.type,
+            title: rawNotification.title,
+            body: rawNotification.message,
+            data: rawNotification.data,
+            related_id: rawNotification.related_id || null,
+            is_read: rawNotification.is_read,
+            read_at: rawNotification.read_at,
+            sent_at: rawNotification.created_at,
+            created_at: rawNotification.created_at,
+          };
 
           setNotifications(prev =>
             prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
@@ -189,7 +215,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         supabase.removeChannel(channel);
       }
     };
-  }, [profile?.email, showPopup, fetchNotifications]);
+  }, [profile?.id, showPopup, fetchNotifications]);
 
   return (
     <NotificationContext.Provider
