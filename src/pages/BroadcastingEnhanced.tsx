@@ -13,6 +13,7 @@ import { MessageSquare, Heart, Calendar, Image as ImageIcon, FileText, Link, Sen
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 
@@ -150,7 +151,7 @@ export default function BroadcastingEnhanced() {
         [commentsData, reactionsData] = await Promise.all([
           supabase
             .from('broadcast_comments')
-            .select('id, broadcast_id, user_id, content, created_at, profiles(full_name)')
+            .select('id, broadcast_id, user_id, content, created_at')
             .in('broadcast_id', broadcastIds)
             .order('created_at', { ascending: true }),
           supabase
@@ -345,6 +346,15 @@ export default function BroadcastingEnhanced() {
         .single();
 
       if (error) throw error;
+
+      if (!formData.scheduled_for) {
+        await sendRoleNotification({
+          roles: ['super_admin', 'administrator', 'communications_officer'],
+          type: 'broadcast_published',
+          title: 'New Broadcast Published',
+          message: 'A new broadcast has been posted to the feed.',
+        });
+      }
 
       toast({
         title: formData.scheduled_for ? 'Broadcast Scheduled' : 'Broadcast Posted',

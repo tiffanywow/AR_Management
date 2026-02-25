@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@googlemaps/js-api-loader';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 export default function CampaignCreate() {
   const navigate = useNavigate();
@@ -383,6 +384,13 @@ export default function CampaignCreate() {
       toast({
         title: 'Campaign Created',
         description: 'Your campaign has been created successfully',
+      });
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'campaign_created',
+        title: 'New Campaign Created',
+        message: `Campaign "${formData.name}" has been created.`,
       });
 
       navigate('/campaigns');

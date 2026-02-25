@@ -12,6 +12,7 @@ import { Upload, Plus, Eye, Edit, Trash2, Image, Video, FileText, List, Play, Pa
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Advert {
   id: string;
@@ -232,6 +233,13 @@ export default function Adverts() {
         description: `Your advertisement has been ${advertStatus === 'scheduled' ? 'scheduled' : 'created'} successfully`,
       });
 
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'advert_created',
+        title: 'New Advert Created',
+        message: `An advertisement "${formData.title}" has been created.`,
+      });
+
       setDialogOpen(false);
       setFormData({
         title: '',
@@ -274,6 +282,13 @@ export default function Adverts() {
         description: `Advert is now ${newStatus}`,
       });
 
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'advert_status_changed',
+        title: 'Advert Status Changed',
+        message: `An advertisement status has been changed to ${newStatus}.`,
+      });
+
       fetchAdverts();
     } catch (error: any) {
       toast({
@@ -296,6 +311,13 @@ export default function Adverts() {
       toast({
         title: 'Advert Deleted',
         description: 'Advertisement has been removed',
+      });
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'advert_deleted',
+        title: 'Advert Deleted',
+        message: `An advertisement has been deleted.`,
       });
 
       fetchAdverts();
@@ -346,17 +368,15 @@ export default function Adverts() {
                 <p className="text-sm text-gray-600 font-light">Select where this ad should appear in the app</p>
                 <div className="grid grid-cols-1 gap-3">
                   <div
-                    className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      formData.format === 'native'
+                    className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.format === 'native'
                         ? 'border-[#d1242a] bg-red-50'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                     onClick={() => setFormData({ ...formData, format: 'native' })}
                   >
                     <div className="mt-0.5">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        formData.format === 'native' ? 'border-[#d1242a]' : 'border-gray-300'
-                      }`}>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${formData.format === 'native' ? 'border-[#d1242a]' : 'border-gray-300'
+                        }`}>
                         {formData.format === 'native' && (
                           <div className="w-3 h-3 rounded-full bg-[#d1242a]" />
                         )}
@@ -522,8 +542,8 @@ export default function Adverts() {
                       type={formData.cta_type === 'phone' ? 'tel' : 'text'}
                       placeholder={
                         formData.cta_type === 'website' ? 'https://example.com' :
-                        formData.cta_type === 'phone' ? '+264 81 123 4567' :
-                        'myapp://path'
+                          formData.cta_type === 'phone' ? '+264 81 123 4567' :
+                            'myapp://path'
                       }
                       value={formData.cta_value}
                       onChange={(e) => setFormData({ ...formData, cta_value: e.target.value })}

@@ -12,6 +12,7 @@ import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, XCircle } from
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Community {
   id: string;
@@ -152,6 +153,13 @@ export default function Communities() {
 
       if (error) throw error;
 
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'community_created',
+        title: 'New Community Created',
+        message: `A new community "${formData.name.trim()}" has been created.`,
+      });
+
       toast({
         title: 'Community Created',
         description: 'Your community has been created successfully',
@@ -259,6 +267,13 @@ export default function Communities() {
         .eq('id', communityId);
 
       if (error) throw error;
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'community_deleted',
+        title: 'Community Deleted',
+        message: 'A community has been deleted.',
+      });
 
       toast({
         title: 'Community Deleted',

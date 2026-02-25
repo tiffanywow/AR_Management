@@ -10,6 +10,7 @@ import { Search, Filter, Download, UserPlus, CheckCircle, XCircle, Eye, MapPin, 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 const COLORS = ['#d1242a', '#ef4444', '#f87171', '#fca5a5'];
 
@@ -310,9 +311,9 @@ export default function Members() {
 
       if (updateError) throw updateError;
 
-      if (member.email) {
+      if (member.user_id) {
         await supabase.from('notifications').insert([{
-          user_id: member.email,
+          user_id: member.user_id,
           title: 'Membership Approved!',
           message: `Congratulations! Your membership has been approved. Your membership number is ${membershipNumber}.`,
           type: 'membership_approved',
@@ -320,6 +321,13 @@ export default function Members() {
           is_read: false,
         }]);
       }
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'member_approved',
+        title: 'Member Approved',
+        message: `Membership for ${member.full_name} ${member.surname} has been approved.`,
+      });
 
       toast({
         title: 'Member Approved',
@@ -353,15 +361,24 @@ export default function Members() {
       if (updateError) throw updateError;
 
       const member = members.find(m => m.id === memberId);
-      if (member) {
+      if (member?.user_id) {
         await supabase.from('notifications').insert([{
-          user_id: member.email,
+          user_id: member.user_id,
           title: 'Membership Application Update',
           message: 'Your membership application has been declined. Please contact support for more information.',
           type: 'membership_rejected',
           data: {},
           is_read: false,
         }]);
+      }
+
+      if (member) {
+        await sendRoleNotification({
+          roles: ['super_admin', 'administrator', 'communications_officer'],
+          type: 'member_declined',
+          title: 'Member Declined',
+          message: `Membership application for ${member.full_name} ${member.surname} has been declined.`,
+        });
       }
 
       toast({

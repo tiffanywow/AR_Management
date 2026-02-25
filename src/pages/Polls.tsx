@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface PollOption {
   text: string;
@@ -175,6 +176,15 @@ export default function Polls() {
 
       console.log('Poll inserted successfully:', data);
 
+      if (broadcast) {
+        await sendRoleNotification({
+          roles: ['super_admin', 'administrator', 'communications_officer'],
+          type: 'poll_created',
+          title: 'New Poll Broadcasted',
+          message: `A new poll "${formData.question.trim()}" is now live.`,
+        });
+      }
+
       toast({
         title: broadcast ? 'Poll Broadcasted' : 'Poll Saved as Draft',
         description: broadcast
@@ -222,6 +232,13 @@ export default function Polls() {
 
       if (error) throw error;
 
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'poll_created',
+        title: 'New Poll Broadcasted',
+        message: `A new poll "${poll.question}" is now live.`,
+      });
+
       toast({
         title: 'Poll Broadcasted',
         description: 'Your poll is now live and collecting responses',
@@ -245,6 +262,13 @@ export default function Polls() {
         .eq('id', pollId);
 
       if (error) throw error;
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'poll_closed',
+        title: 'Poll Closed',
+        message: 'A poll has been closed.',
+      });
 
       toast({
         title: 'Poll Closed',

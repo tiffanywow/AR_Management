@@ -13,6 +13,7 @@ import { Plus, TrendingDown, DollarSign, FileText, Calendar, ArrowLeft, Search, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Expense {
   id: string;

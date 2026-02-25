@@ -16,7 +16,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-export type UserRole = 'super_admin' | 'administrator' | 'finance';
+export type UserRole = 'super_admin' | 'administrator' | 'finance' | 'communications_officer';
 
 export interface Profile {
   id: string;
