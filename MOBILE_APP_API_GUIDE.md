@@ -412,310 +412,35 @@ async function getPollResults(pollId) {
 
 ### Get User Communities
 
-Retrieve all communities a user belongs to, including leader information.
-
 ```javascript
 async function getUserCommunities(userId) {
-  const { data: memberships, error } = await supabase
+  const { data, error } = await supabase
     .from('community_members')
-    .select('community_id')
-    .eq('user_id', userId)
-    .eq('status', 'active');
-
-  if (error) throw error;
-
-  if (!memberships || memberships.length === 0) {
-    return [];
-  }
-
-  const communityIds = memberships.map(m => m.community_id);
-
-  const { data: communities, error: commError } = await supabase
-    .from('communities')
     .select(`
       *,
-      leader:leader_id(id, full_name, surname, phone_number, email)
+      communities(*)
     `)
-    .in('id', communityIds)
-    .eq('status', 'active');
+    .eq('user_id', userId);
 
-  if (commError) throw commError;
-  return communities || [];
+  if (error) throw error;
+  return data.map(cm => cm.communities);
 }
 ```
 
-**Response Format**:
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Youth Wing",
-    "description": "Community for young members",
-    "leader_id": "uuid",
-    "leader_title": "Chairman",
-    "leader_contact": "+264811234567",
-    "member_count": 150,
-    "created_at": "2025-01-15T10:00:00Z",
-    "leader": {
-      "id": "uuid",
-      "full_name": "Werner",
-      "surname": "Alweendo",
-      "phone_number": "+264811234567",
-      "email": "werner@example.com"
-    }
-  }
-]
-```
-
-**UI Display Recommendation for Community List**:
-
-Each community card in the list should show:
-- Community name and type
-- Member count
-- Leader name and title (if assigned)
-
-Example card:
-```
-┌─────────────────────────────────┐
-│ 👥 Youth Wing                   │
-│ 150 members • Youth             │
-│                                 │
-│ 👑 Chairman: Werner Alweendo   │
-└─────────────────────────────────┘
-```
-
 ### Get Community Details
-
-Retrieve detailed information about a specific community, including the leader.
-
-**IMPORTANT FOR MOBILE APP**: Display the community leader information prominently on the community details page.
 
 ```javascript
 async function getCommunityDetails(communityId) {
   const { data, error } = await supabase
     .from('communities')
-    .select(`
-      *,
-      leader:leader_id(id, full_name, surname, phone_number, email)
-    `)
+    .select('*')
     .eq('id', communityId)
-    .maybeSingle();
+    .single();
 
   if (error) throw error;
   return data;
 }
 ```
-
-**Response Format**:
-```json
-{
-  "id": "uuid",
-  "name": "Youth Wing",
-  "description": "Community for young members",
-  "community_type": "youth",
-  "privacy_setting": "public",
-  "leader_id": "uuid",
-  "leader_title": "Chairman",
-  "leader_contact": "+264811234567",
-  "member_count": 150,
-  "created_at": "2025-01-15T10:00:00Z",
-  "status": "active",
-  "leader": {
-    "id": "uuid",
-    "full_name": "Werner",
-    "surname": "Alweendo",
-    "phone_number": "+264811234567",
-    "email": "werner@example.com"
-  }
-}
-```
-
-**UI Display Recommendation for Mobile App**:
-
-The community details page should display the leader section as follows:
-
-```
-┌─────────────────────────────────────┐
-│  Youth Wing                         │
-│  150 members • Public               │
-│                                     │
-│  Description of community...        │
-│                                     │
-│  ┌─────────────────────────────┐   │
-│  │ 👑 Community Leader         │   │
-│  │                             │   │
-│  │ Chairman                    │   │
-│  │ Werner Alweendo             │   │
-│  │ 📱 +264811234567            │   │
-│  │ ✉️  werner@example.com      │   │
-│  └─────────────────────────────┘   │
-│                                     │
-│  [View Members] [View Posts]       │
-└─────────────────────────────────────┘
-```
-
-**Display Logic**:
-- Show leader section ONLY if `leader_id` is not null
-- Display `leader_title` (e.g., "Chairman", "President") if available, otherwise show "Community Leader"
-- Show leader's full name: `${leader.full_name} ${leader.surname}`
-- Display phone number if `leader.phone_number` is not null
-- Display email if `leader.email` is not null
-- The leader section should be visually distinct (e.g., card with light background)
-
-### Get All Communities
-
-Retrieve all active communities with leader information (useful for community discovery).
-
-```javascript
-async function getAllCommunities(limit = 50, offset = 0) {
-  const { data, error } = await supabase
-    .from('communities')
-    .select(`
-      *,
-      leader:leader_id(id, full_name, surname, phone_number, email)
-    `)
-    .eq('status', 'active')
-    .eq('privacy_setting', 'public')
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
-
-  if (error) throw error;
-  return data || [];
-}
-```
-
-**Response Format**:
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Youth Wing",
-    "description": "Community for young members",
-    "community_type": "youth",
-    "privacy_setting": "public",
-    "leader_id": "uuid",
-    "leader_title": "Chairman",
-    "leader_contact": "+264811234567",
-    "member_count": 150,
-    "created_at": "2025-01-15T10:00:00Z",
-    "leader": {
-      "id": "uuid",
-      "full_name": "Werner",
-      "surname": "Alweendo",
-      "phone_number": "+264811234567",
-      "email": "werner@example.com"
-    }
-  },
-  {
-    "id": "uuid",
-    "name": "Women's Network",
-    "description": "Empowering women members",
-    "community_type": "women",
-    "privacy_setting": "public",
-    "leader_id": "uuid",
-    "leader_title": "President",
-    "leader_contact": "+264812345678",
-    "member_count": 200,
-    "created_at": "2025-01-10T10:00:00Z",
-    "leader": {
-      "id": "uuid",
-      "full_name": "Tiffany",
-      "surname": "Nels",
-      "phone_number": "+264812345678",
-      "email": "tiffany@example.com"
-    }
-  }
-]
-```
-
-### Join a Community
-
-Allow users to join public communities or request to join private communities.
-
-**IMPORTANT**:
-- For **public communities**: Users are added immediately with status `'active'`
-- For **private communities**: A join request is created with status `'requested'` and must be approved by admins on the management dashboard
-
-```javascript
-async function joinCommunity(userId, communityId, isPrivate = false) {
-  const status = isPrivate ? 'requested' : 'active';
-
-  const { data, error } = await supabase
-    .from('community_members')
-    .insert([{
-      community_id: communityId,
-      user_id: userId,
-      role: 'member',
-      status: status
-    }])
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    if (error.message?.includes('duplicate')) {
-      throw new Error('Already a member or request pending');
-    }
-    throw error;
-  }
-
-  if (!isPrivate) {
-    await supabase.rpc('increment_community_member_count', {
-      community_id: communityId
-    });
-  }
-
-  return data;
-}
-```
-
-**Response Format**:
-```json
-{
-  "id": "uuid",
-  "community_id": "uuid",
-  "user_id": "uuid",
-  "role": "member",
-  "status": "requested",
-  "joined_at": "2025-02-18T10:00:00Z"
-}
-```
-
-**UI Recommendations**:
-- Show "Join" button for public communities (immediate access)
-- Show "Request to Join" button for private communities
-- Display "Request Pending" status after requesting private community access
-- Show success message: "You've joined the community" (public) or "Request sent for approval" (private)
-
-### Check Community Membership Status
-
-Check if a user is a member of a community or has a pending request.
-
-```javascript
-async function getCommunityMembershipStatus(userId, communityId) {
-  const { data, error } = await supabase
-    .from('community_members')
-    .select('status, role')
-    .eq('user_id', userId)
-    .eq('community_id', communityId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
-}
-```
-
-**Response Format**:
-```json
-{
-  "status": "active",
-  "role": "member"
-}
-```
-
-Possible status values:
-- `"active"` - User is an active member
-- `"requested"` - Join request is pending approval
-- `null` - User is not a member and has no pending request
 
 ### Get Community Broadcasts
 

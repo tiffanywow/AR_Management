@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyC5EXSFu-wklG3S6W8QNg7EQFt8VL4wNMA';
 
 interface RegionalAuthority {
   id: string;
@@ -97,12 +97,7 @@ const render = (status: Status) => {
       return (
         <div className="w-full h-[500px] flex items-center justify-center bg-red-50 rounded-lg border border-red-200">
           <div className="text-center">
-            <p className="text-sm font-medium text-red-600 mb-2">Failed to load Google Maps</p>
-            <p className="text-xs text-red-500">
-              {!GOOGLE_MAPS_API_KEY
-                ? 'Google Maps API key is missing. Please add VITE_GOOGLE_MAPS_API_KEY to your .env file.'
-                : 'Please check your API key and ensure it has the necessary permissions.'}
-            </p>
+            <p className="text-sm text-red-600">Failed to load map</p>
           </div>
         </div>
       );

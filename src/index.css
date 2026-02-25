@@ -132,19 +132,3 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
-
-@media print {
-  body * {
-    visibility: hidden;
-  }
-  #membership-card-preview,
-  #membership-card-preview * {
-    visibility: visible;
-  }
-  #membership-card-preview {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
-}

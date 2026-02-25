@@ -6,9 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Save, Building2, Target, Award, Users, Phone, Mail, Globe, MapPin, Map, Edit2, X, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, Building2, Target, Award, Users, Phone, Mail, Globe, MapPin, Map, Edit2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,7 +43,6 @@ interface Leader {
   name: string;
   position: string;
   region: string;
-  level: 'national' | 'regional' | 'district' | 'community';
   sort_order: number;
   is_active: boolean;
 }
@@ -91,12 +89,6 @@ export default function PartyManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentSection, setCurrentSection] = useState<'values' | 'leadership' | 'achievements' | 'contacts'>('values');
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [draggedLeader, setDraggedLeader] = useState<Leader | null>(null);
-  const [currentLeaderLevel, setCurrentLeaderLevel] = useState<'national' | 'regional' | 'district' | 'community'>('national');
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{ id: string; table: string; level?: string } | null>(null);
-  const [sortOrderConflictDialog, setSortOrderConflictDialog] = useState(false);
-  const [pendingSaveData, setPendingSaveData] = useState<{ formData: any; table: string; dataToSave: any } | null>(null);
 
   useEffect(() => {
     fetchAllData();
@@ -218,10 +210,9 @@ export default function PartyManagement() {
     }
   };
 
-  const handleOpenDialog = (section: 'values' | 'leadership' | 'achievements' | 'contacts', item?: any, level?: 'national' | 'regional' | 'district' | 'community') => {
+  const handleOpenDialog = (section: 'values' | 'leadership' | 'achievements' | 'contacts', item?: any) => {
     setCurrentSection(section);
     setEditingItem(item || null);
-    if (level) setCurrentLeaderLevel(level);
     setDialogOpen(true);
   };
 
@@ -229,89 +220,21 @@ export default function PartyManagement() {
     setLoading(true);
     try {
       let table = '';
-      let dataToSave = { ...formData };
+      if (currentSection === 'values') table = 'about_values';
+      else if (currentSection === 'leadership') table = 'about_leadership';
+      else if (currentSection === 'achievements') table = 'about_achievements';
+      else if (currentSection === 'contacts') table = 'about_contact';
 
-      if (currentSection === 'values') {
-        table = 'about_values';
-        dataToSave = {
-          icon: formData.icon,
-          title: formData.title,
-          description: formData.description,
-          sort_order: formData.sort_order,
-          is_active: formData.is_active
-        };
-      } else if (currentSection === 'leadership') {
-        table = 'about_leadership';
-        dataToSave = {
-          name: formData.name,
-          position: formData.position,
-          region: formData.region,
-          level: formData.level,
-          sort_order: formData.sort_order,
-          is_active: formData.is_active
-        };
-      } else if (currentSection === 'achievements') {
-        table = 'about_achievements';
-        dataToSave = {
-          text: formData.text,
-          sort_order: formData.sort_order,
-          is_active: formData.is_active
-        };
-      } else if (currentSection === 'contacts') {
-        table = 'about_contact';
-        dataToSave = {
-          icon: formData.icon,
-          label: formData.label,
-          value: formData.value,
-          url: formData.url,
-          sort_order: formData.sort_order,
-          is_active: formData.is_active
-        };
-      }
-
-      let query = supabase
-        .from(table)
-        .select('id, sort_order')
-        .eq('sort_order', formData.sort_order);
-
-      if (currentSection === 'leadership') {
-        query = query.eq('level', formData.level);
-      }
-
-      if (editingItem) {
-        query = query.neq('id', editingItem.id);
-      }
-
-      const { data: conflictingItems, error: conflictError } = await query;
-
-      if (conflictError) throw conflictError;
-
-      if (conflictingItems && conflictingItems.length > 0) {
-        setPendingSaveData({ formData, table, dataToSave });
-        setSortOrderConflictDialog(true);
-        setLoading(false);
-        return;
-      }
-
-      await performSave(table, dataToSave);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      setLoading(false);
-    }
-  };
-
-  const performSave = async (table: string, dataToSave: any) => {
-    try {
       if (editingItem) {
         const { error } = await supabase
           .from(table)
-          .update(dataToSave)
+          .update(formData)
           .eq('id', editingItem.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from(table)
-          .insert([dataToSave]);
+          .insert([formData]);
         if (error) throw error;
       }
 
@@ -325,92 +248,14 @@ export default function PartyManagement() {
     }
   };
 
-  const handleConfirmSortOrderOverwrite = async () => {
-    if (!pendingSaveData) return;
-
-    setLoading(true);
-    setSortOrderConflictDialog(false);
-
+  const handleDelete = async (id: string, table: string) => {
     try {
-      const { table, dataToSave, formData } = pendingSaveData;
-
-      let shiftQuery = supabase
-        .from(table)
-        .select('id, sort_order');
-
-      if (currentSection === 'leadership') {
-        shiftQuery = shiftQuery.eq('level', formData.level);
-      }
-
-      shiftQuery = shiftQuery.gte('sort_order', formData.sort_order);
-
-      if (editingItem) {
-        shiftQuery = shiftQuery.neq('id', editingItem.id);
-      }
-
-      const { data: itemsToShift, error: fetchError } = await shiftQuery.order('sort_order', { ascending: false });
-
-      if (fetchError) throw fetchError;
-
-      if (itemsToShift && itemsToShift.length > 0) {
-        for (const item of itemsToShift) {
-          const { error: updateError } = await supabase
-            .from(table)
-            .update({ sort_order: item.sort_order + 1 })
-            .eq('id', item.id);
-
-          if (updateError) throw updateError;
-        }
-      }
-
-      await performSave(table, dataToSave);
-      setPendingSaveData(null);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      setLoading(false);
-      setPendingSaveData(null);
-    }
-  };
-
-  const handleDeleteClick = (id: string, table: string, level?: string) => {
-    setItemToDelete({ id, table, level });
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!itemToDelete) return;
-
-    try {
-      const { id, table, level } = itemToDelete;
-
       const { error } = await supabase
         .from(table)
         .delete()
         .eq('id', id);
       if (error) throw error;
-
-      if (table === 'about_leadership' && level) {
-        const remainingLeaders = leadership
-          .filter(l => l.level === level && l.id !== id)
-          .sort((a, b) => a.sort_order - b.sort_order);
-
-        const updates = remainingLeaders.map((leader, index) => ({
-          id: leader.id,
-          sort_order: index + 1
-        }));
-
-        for (const update of updates) {
-          const { error: updateError } = await supabase
-            .from('about_leadership')
-            .update({ sort_order: update.sort_order })
-            .eq('id', update.id);
-          if (updateError) throw updateError;
-        }
-      }
-
       toast({ title: 'Success', description: 'Item deleted' });
-      setDeleteDialogOpen(false);
-      setItemToDelete(null);
       fetchAllData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -470,55 +315,6 @@ export default function PartyManagement() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDragStart = (leader: Leader) => {
-    setDraggedLeader(leader);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = async (targetLeader: Leader) => {
-    if (!draggedLeader || draggedLeader.id === targetLeader.id || draggedLeader.level !== targetLeader.level) {
-      setDraggedLeader(null);
-      return;
-    }
-
-    const levelLeaders = leadership.filter(l => l.level === targetLeader.level);
-    const draggedIndex = levelLeaders.findIndex(l => l.id === draggedLeader.id);
-    const targetIndex = levelLeaders.findIndex(l => l.id === targetLeader.id);
-
-    const reordered = [...levelLeaders];
-    const [removed] = reordered.splice(draggedIndex, 1);
-    reordered.splice(targetIndex, 0, removed);
-
-    const updates = reordered.map((leader, index) => ({
-      id: leader.id,
-      sort_order: index + 1
-    }));
-
-    try {
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('about_leadership')
-          .update({ sort_order: update.sort_order })
-          .eq('id', update.id);
-        if (error) throw error;
-      }
-
-      toast({ title: 'Success', description: 'Leadership order updated' });
-      fetchLeadership();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
-
-    setDraggedLeader(null);
-  };
-
-  const getLeadersByLevel = (level: string) => {
-    return leadership.filter(l => l.level === level).sort((a, b) => a.sort_order - b.sort_order);
   };
 
   return (
@@ -660,7 +456,7 @@ export default function PartyManagement() {
                       <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('values', value)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(value.id, 'about_values')}>
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(value.id, 'about_values')}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -672,72 +468,44 @@ export default function PartyManagement() {
         </TabsContent>
 
         <TabsContent value="leadership" className="space-y-6">
-          {(['national', 'regional', 'district', 'community'] as const).map((level) => {
-            const leaders = getLeadersByLevel(level);
-            const levelTitle = level.charAt(0).toUpperCase() + level.slice(1);
-
-            return (
-              <Card key={level}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-[#d1242a]" />
+                    Leadership Team
+                  </CardTitle>
+                  <CardDescription>Organization leaders and their roles</CardDescription>
+                </div>
+                <Button onClick={() => handleOpenDialog('leadership')} className="bg-[#d1242a] hover:bg-[#b91c1c]">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Leader
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {leadership.map((leader) => (
+                  <div key={leader.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5 text-[#d1242a]" />
-                        {levelTitle} Leadership
-                      </CardTitle>
-                      <CardDescription>{levelTitle} level leaders and their roles</CardDescription>
+                      <h3 className="font-medium">{leader.name}</h3>
+                      <p className="text-sm text-gray-600">{leader.position}</p>
+                      <p className="text-xs text-gray-500">{leader.region}</p>
                     </div>
-                    <Button onClick={() => handleOpenDialog('leadership', null, level)} className="bg-[#d1242a] hover:bg-[#b91c1c]">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Leader
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('leadership', leader)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(leader.id, 'about_leadership')}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {leaders.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      No {level} leaders added yet
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {leaders.map((leader) => (
-                        <div
-                          key={leader.id}
-                          draggable
-                          onDragStart={() => handleDragStart(leader)}
-                          onDragOver={handleDragOver}
-                          onDrop={() => handleDrop(leader)}
-                          className={`flex items-center justify-between p-4 border rounded-lg cursor-move hover:bg-gray-50 transition-colors ${
-                            draggedLeader?.id === leader.id ? 'opacity-50' : ''
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 flex-1">
-                            <GripVertical className="h-5 w-5 text-gray-400" />
-                            <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded text-gray-500 text-sm font-medium">
-                              {leader.sort_order}
-                            </div>
-                            <div>
-                              <h3 className="font-medium">{leader.name}</h3>
-                              <p className="text-sm text-gray-600">{leader.position}</p>
-                              <p className="text-xs text-gray-500">{leader.region}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('leadership', leader, level)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(leader.id, 'about_leadership', level)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="achievements" className="space-y-6">
@@ -766,7 +534,7 @@ export default function PartyManagement() {
                       <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('achievements', achievement)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(achievement.id, 'about_achievements')}>
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(achievement.id, 'about_achievements')}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -811,7 +579,7 @@ export default function PartyManagement() {
                       <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleOpenDialog('contacts', contact)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDeleteClick(contact.id, 'about_contact')}>
+                      <Button variant="ghost" size="sm" className="bg-gray-100 hover:bg-gray-200" onClick={() => handleDelete(contact.id, 'about_contact')}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -945,75 +713,34 @@ export default function PartyManagement() {
         item={editingItem}
         onSave={handleSaveItem}
         loading={loading}
-        leaderLevel={currentLeaderLevel}
       />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this item from the list. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-[#d1242a] hover:bg-[#b91c1c]">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={sortOrderConflictDialog} onOpenChange={setSortOrderConflictDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sort Order Already Exists</AlertDialogTitle>
-            <AlertDialogDescription>
-              Another item already has this sort order number. Do you want to overwrite it? The existing item will be moved down to the next position, and all subsequent items will be shifted accordingly.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setPendingSaveData(null);
-              setSortOrderConflictDialog(false);
-            }}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSortOrderOverwrite} className="bg-[#d1242a] hover:bg-[#b91c1c]">
-              Yes, Overwrite
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
 
-function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leaderLevel }: any) {
+function ItemDialog({ open, onOpenChange, section, item, onSave, loading }: any) {
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
-    if (open) {
-      if (item) {
-        setFormData(item);
-      } else {
-        setFormData({
-          icon: '⭐',
-          title: '',
-          description: '',
-          name: '',
-          position: '',
-          region: '',
-          level: leaderLevel || 'national',
-          text: '',
-          label: '',
-          value: '',
-          url: '',
-          sort_order: 1,
-          is_active: true,
-        });
-      }
+    if (item) {
+      setFormData(item);
+    } else {
+      setFormData({
+        icon: '⭐',
+        title: '',
+        description: '',
+        name: '',
+        position: '',
+        region: '',
+        text: '',
+        label: '',
+        value: '',
+        url: '',
+        sort_order: 0,
+        is_active: true,
+      });
     }
-  }, [open, item, section, leaderLevel]);
+  }, [item, section]);
 
   const handleSubmit = () => {
     onSave(formData);
@@ -1056,14 +783,6 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leader
 
           {section === 'leadership' && (
             <>
-              <div className="space-y-2">
-                <Label>Level</Label>
-                <Input
-                  value={(formData.level || leaderLevel || 'national').charAt(0).toUpperCase() + (formData.level || leaderLevel || 'national').slice(1)}
-                  disabled
-                  className="bg-gray-50"
-                />
-              </div>
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input
@@ -1139,9 +858,8 @@ function ItemDialog({ open, onOpenChange, section, item, onSave, loading, leader
             <Label>Sort Order</Label>
             <Input
               type="number"
-              min="1"
-              value={formData.sort_order || 1}
-              onChange={(e) => setFormData({ ...formData, sort_order: Math.max(1, parseInt(e.target.value) || 1) })}
+              value={formData.sort_order || 0}
+              onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) })}
             />
           </div>
 

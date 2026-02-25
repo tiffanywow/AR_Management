@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface Notification {
   id: string;
@@ -9,7 +10,6 @@ export interface Notification {
   title: string;
   body: string;
   data: Record<string, any> | null;
-  related_id: string | null;
   is_read: boolean;
   read_at: string | null;
   sent_at: string | null;
@@ -46,14 +46,20 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  // Use a ref instead of state to avoid stale-closure issues in cleanup
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchNotifications = useCallback(async () => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+      console.log('No profile ID available for fetching notifications');
+      return;
+    }
 
     setLoading(true);
     try {
+      console.log('Fetching notifications for user:', profile.id);
       const { data, error } = await supabase
-        .from('push_notifications')
+        .from('notifications')
         .select('*')
         .eq('user_id', profile.id)
         .order('created_at', { ascending: false })
@@ -61,8 +67,23 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
 
       if (error) throw error;
 
-      setNotifications(data || []);
-      setUnreadCount((data || []).filter(n => !n.is_read).length);
+      console.log('Fetched notifications:', data?.length || 0);
+
+      const mappedData = (data || []).map(n => ({
+        id: n.id,
+        user_id: n.user_id,
+        notification_type: n.type,
+        title: n.title,
+        body: n.message,
+        data: n.data,
+        is_read: n.is_read,
+        read_at: n.read_at,
+        sent_at: n.created_at,
+        created_at: n.created_at,
+      }));
+
+      setNotifications(mappedData);
+      setUnreadCount(mappedData.filter(n => !n.is_read).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
@@ -73,7 +94,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const markAsRead = async (notificationId: string) => {
     try {
       const { error } = await supabase
-        .from('push_notifications')
+        .from('notifications')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('id', notificationId);
 
@@ -93,7 +114,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
 
     try {
       const { error } = await supabase
-        .from('push_notifications')
+        .from('notifications')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('user_id', profile.id)
         .eq('is_read', false);
@@ -119,6 +140,12 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
 
     fetchNotifications();
 
+    // Remove any existing channel before creating a new one
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     const notificationChannel = supabase
       .channel(`notifications:${profile.id}`)
       .on(
@@ -126,11 +153,23 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'push_notifications',
+          table: 'notifications',
           filter: `user_id=eq.${profile.id}`,
         },
         (payload) => {
-          const newNotification = payload.new as Notification;
+          const rawNotification = payload.new as any;
+          const newNotification: Notification = {
+            id: rawNotification.id,
+            user_id: rawNotification.user_id,
+            notification_type: rawNotification.type,
+            title: rawNotification.title,
+            body: rawNotification.message,
+            data: rawNotification.data,
+            is_read: rawNotification.is_read,
+            read_at: rawNotification.read_at,
+            sent_at: rawNotification.created_at,
+            created_at: rawNotification.created_at,
+          };
 
           setNotifications(prev => [newNotification, ...prev]);
           setUnreadCount(prev => prev + 1);
@@ -143,11 +182,23 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'push_notifications',
+          table: 'notifications',
           filter: `user_id=eq.${profile.id}`,
         },
         (payload) => {
-          const updatedNotification = payload.new as Notification;
+          const rawNotification = payload.new as any;
+          const updatedNotification: Notification = {
+            id: rawNotification.id,
+            user_id: rawNotification.user_id,
+            notification_type: rawNotification.type,
+            title: rawNotification.title,
+            body: rawNotification.message,
+            data: rawNotification.data,
+            is_read: rawNotification.is_read,
+            read_at: rawNotification.read_at,
+            sent_at: rawNotification.created_at,
+            created_at: rawNotification.created_at,
+          };
 
           setNotifications(prev =>
             prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
@@ -160,11 +211,16 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
       )
       .subscribe();
 
+    // Store in ref so cleanup always has the latest reference
+    channelRef.current = notificationChannel;
+
     return () => {
-      notificationChannel.unsubscribe();
-      supabase.removeChannel(notificationChannel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [profile?.id, fetchNotifications, showPopup]);
+  }, [profile?.id, showPopup, fetchNotifications]);
 
   return (
     <NotificationContext.Provider
