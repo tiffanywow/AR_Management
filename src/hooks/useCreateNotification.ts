@@ -44,7 +44,6 @@ export function useCreateNotification() {
         title: notification.title,
         message: notification.body,
         data: notification.data || null,
-        related_id: notification.related_id || null,
         is_read: false,
         created_at: new Date().toISOString(),
       }));

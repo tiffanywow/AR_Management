@@ -90,10 +90,9 @@ export default function NotificationsDropdown() {
           <h3 className="font-semibold text-sm">Notifications</h3>
           {unreadCount > 0 && (
             <Button
-              variant="ghost"
               size="sm"
               onClick={markAllAsRead}
-              className="text-xs h-7"
+              className="text-xs h-7 bg-gray-800 hover:bg-gray-700 text-white"
             >
               <CheckCheck className="h-3 w-3 mr-1" />
               Mark all read
@@ -116,9 +115,8 @@ export default function NotificationsDropdown() {
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
-                    !notification.is_read ? 'bg-blue-50/50' : ''
-                  }`}
+                  className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${!notification.is_read ? 'bg-blue-50/50' : ''
+                    }`}
                   onClick={() => !notification.is_read && markAsRead(notification.id)}
                 >
                   <div className="flex items-start gap-3">
@@ -154,7 +152,7 @@ export default function NotificationsDropdown() {
           <div className="border-t px-4 py-2 text-center">
             <button
               onClick={refreshNotifications}
-              className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-xs bg-gray-800 hover:bg-gray-700 text-white px-4 py-1.5 rounded-md transition-colors"
             >
               Refresh notifications
             </button>

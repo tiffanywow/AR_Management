@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import { RealtimeChannel } from '@supabase/supabase-js';
@@ -10,7 +10,6 @@ export interface Notification {
   title: string;
   body: string;
   data: Record<string, any> | null;
-  related_id: string | null;
   is_read: boolean;
   read_at: string | null;
   sent_at: string | null;
@@ -47,7 +46,8 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
+  // Use a ref instead of state to avoid stale-closure issues in cleanup
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!profile?.id) {
@@ -76,7 +76,6 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
         title: n.title,
         body: n.message,
         data: n.data,
-        related_id: n.related_id || null,
         is_read: n.is_read,
         read_at: n.read_at,
         sent_at: n.created_at,
@@ -141,6 +140,12 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
 
     fetchNotifications();
 
+    // Remove any existing channel before creating a new one
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     const notificationChannel = supabase
       .channel(`notifications:${profile.id}`)
       .on(
@@ -160,7 +165,6 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
             title: rawNotification.title,
             body: rawNotification.message,
             data: rawNotification.data,
-            related_id: rawNotification.related_id || null,
             is_read: rawNotification.is_read,
             read_at: rawNotification.read_at,
             sent_at: rawNotification.created_at,
@@ -190,7 +194,6 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
             title: rawNotification.title,
             body: rawNotification.message,
             data: rawNotification.data,
-            related_id: rawNotification.related_id || null,
             is_read: rawNotification.is_read,
             read_at: rawNotification.read_at,
             sent_at: rawNotification.created_at,
@@ -208,11 +211,13 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
       )
       .subscribe();
 
-    setChannel(notificationChannel);
+    // Store in ref so cleanup always has the latest reference
+    channelRef.current = notificationChannel;
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
     };
   }, [profile?.id, showPopup, fetchNotifications]);
