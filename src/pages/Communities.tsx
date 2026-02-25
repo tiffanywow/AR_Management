@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2 } from 'lucide-react';
+import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +46,7 @@ export default function Communities() {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [communityMembers, setCommunityMembers] = useState<any[]>([]);
   const [availableMembers, setAvailableMembers] = useState<any[]>([]);
+  const [selectedForAddition, setSelectedForAddition] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -90,17 +91,36 @@ export default function Communities() {
 
   const fetchCommunityMembers = async (communityId: string) => {
     try {
-      const { data, error } = await supabase
+      // First get the community members
+      const { data: membersData, error: membersError } = await supabase
         .from('community_members')
-        .select(`
-          *,
-          memberships:user_id(id, user_id, full_name, surname, email, region)
-        `)
+        .select('*')
         .eq('community_id', communityId)
         .eq('status', 'active');
 
-      if (error) throw error;
-      setCommunityMembers(data || []);
+      if (membersError) throw membersError;
+
+      if (!membersData || membersData.length === 0) {
+        setCommunityMembers([]);
+        return;
+      }
+
+      // Then get their membership details
+      const userIds = membersData.map(m => m.user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('memberships')
+        .select('id, user_id, full_name, surname, email, region')
+        .in('user_id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const combinedData = membersData.map(member => ({
+        ...member,
+        memberships: profilesData?.find(p => p.user_id === member.user_id) || null
+      }));
+
+      setCommunityMembers(combinedData);
     } catch (error) {
       console.error('Error fetching community members:', error);
     }
@@ -156,46 +176,44 @@ export default function Communities() {
     }
   };
 
-  const handleAddMemberToCommunity = async (memberId: string) => {
-    if (!selectedCommunity || !user) return;
+  const handleAddMultipleMembers = async () => {
+    if (!selectedCommunity || !user || selectedForAddition.length === 0) return;
 
+    setLoading(true);
     try {
-      const { error } = await supabase.from('community_members').insert([{
+      const inserts = selectedForAddition.map(memberId => ({
         community_id: selectedCommunity.id,
         user_id: memberId,
         role: 'member',
         status: 'active',
         invited_by: user.id,
-      }]);
+      }));
+
+      const { error } = await supabase.from('community_members').insert(inserts);
 
       if (error) throw error;
 
       await supabase
         .from('communities')
-        .update({ member_count: selectedCommunity.member_count + 1 })
+        .update({ member_count: selectedCommunity.member_count + inserts.length })
         .eq('id', selectedCommunity.id);
 
       toast({
-        title: 'Member Added',
-        description: 'Member has been added to the community',
+        title: 'Members Added',
+        description: `${inserts.length} member(s) added successfully`,
       });
 
+      setSelectedForAddition([]);
       fetchCommunityMembers(selectedCommunity.id);
       fetchCommunities();
     } catch (error: any) {
-      if (error.message?.includes('duplicate')) {
-        toast({
-          title: 'Already a Member',
-          description: 'This person is already in the community',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to add member',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add members',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -259,6 +277,7 @@ export default function Communities() {
 
   const handleViewMembers = (community: Community) => {
     setSelectedCommunity(community);
+    setSelectedForAddition([]);
     fetchCommunityMembers(community.id);
     setMembersDialogOpen(true);
   };
@@ -466,22 +485,58 @@ export default function Communities() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Add Member</Label>
-              <Select onValueChange={handleAddMemberToCommunity}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a member to add" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableMembers
-                    .filter(m => !communityMembers.find(cm => cm.user_id === m.user_id))
-                    .map((member) => (
-                      <SelectItem key={member.id} value={member.user_id}>
-                        {member.full_name} {member.surname} ({member.region || 'No region'})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-4">
+              <Label>Add Members</Label>
+              <div className="flex gap-2 items-start">
+                <Select
+                  value=""
+                  onValueChange={(val) => {
+                    if (val && !selectedForAddition.includes(val)) {
+                      setSelectedForAddition([...selectedForAddition, val]);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select members to add..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMembers
+                      .filter(m => !communityMembers.find(cm => cm.user_id === m.user_id))
+                      .filter(m => !selectedForAddition.includes(m.user_id))
+                      .map((member) => (
+                        <SelectItem key={member.id} value={member.user_id}>
+                          {member.full_name} {member.surname} ({member.region || 'No region'})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAddMultipleMembers}
+                  disabled={selectedForAddition.length === 0 || loading}
+                  className="bg-[#d1242a] hover:bg-[#b91c1c] shrink-0"
+                >
+                  {loading ? 'Adding...' : `Add ${selectedForAddition.length} Member(s)`}
+                </Button>
+              </div>
+
+              {selectedForAddition.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 p-3 bg-gray-50 border rounded-md">
+                  {selectedForAddition.map(id => {
+                    const member = availableMembers.find(m => m.user_id === id);
+                    return (
+                      <Badge key={id} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                        {member?.full_name} {member?.surname}
+                        <button
+                          className="hover:bg-gray-200 rounded-full p-0.5 ml-1"
+                          onClick={() => setSelectedForAddition(selectedForAddition.filter(v => v !== id))}
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <Separator className="my-4" />

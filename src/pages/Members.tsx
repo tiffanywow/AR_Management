@@ -956,13 +956,13 @@ export default function Members() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={regionData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="region" 
+                  <XAxis
+                    dataKey="region"
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 12, fill: '#64748b' }}
                   />
-                  <YAxis 
+                  <YAxis
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 12, fill: '#64748b' }}
@@ -988,10 +988,12 @@ export default function Members() {
                     data={ageData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius={110}
+                    innerRadius={60}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}%`}
+                    labelLine={false}
+                    label={({ name, percent }) => percent > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
                   >
                     {ageData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
