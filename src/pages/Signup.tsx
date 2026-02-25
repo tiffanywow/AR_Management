@@ -41,31 +41,48 @@ export default function Signup() {
 
       if (error) {
         console.error('Signup error:', error);
-        throw error;
+
+        let errorMessage = error.message || 'Failed to create account';
+
+        if (error.message?.includes('already registered') || error.message?.includes('user_already_exists')) {
+          errorMessage = 'This email is already registered. Please use a different email or try logging in.';
+        } else if (error.message?.includes('password')) {
+          errorMessage = 'Password must be at least 6 characters long.';
+        } else if (error.message?.includes('Invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        }
+
+        toast({
+          title: 'Signup Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+
+        setLoading(false);
+        return;
       }
 
       if (data.user) {
         console.log('User created:', data.user.id);
 
         toast({
-          title: 'Account Created',
-          description: 'Your account has been created successfully. You can now log in.',
+          title: 'Account Created Successfully',
+          description: 'Redirecting to dashboard...',
         });
 
         setTimeout(() => {
-          navigate('/login');
-        }, 1000);
+          navigate('/dashboard');
+        }, 1500);
       } else {
         throw new Error('No user data returned from signup');
       }
     } catch (error: any) {
-      console.error('Signup error:', error);
+      console.error('Unexpected signup error:', error);
       toast({
-        title: 'Signup Failed',
-        description: error.message || 'Failed to create account',
+        title: 'Unexpected Error',
+        description: 'An unexpected error occurred. Please try again.',
         variant: 'destructive',
       });
-    } finally {
       setLoading(false);
     }
   };

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
+import { Toaster as ShadcnToaster } from '@/components/ui/toaster';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import NotificationManager from '@/components/notifications/NotificationManager';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -103,6 +104,7 @@ function App() {
           <div className="min-h-screen bg-gray-50">
             <AppRoutes />
             <Toaster />
+            <ShadcnToaster />
           </div>
         </NotificationManager>
       </Router>
