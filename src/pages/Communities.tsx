@@ -105,17 +105,36 @@ export default function Communities() {
 
   const fetchCommunityMembers = async (communityId: string) => {
     try {
-      const { data, error } = await supabase
+      // First get community members
+      const { data: members, error: membersError } = await supabase
         .from('community_members')
-        .select(`
-          *,
-          member:user_id(id, user_id, full_name, surname, email, region)
-        `)
+        .select('*')
         .eq('community_id', communityId)
         .eq('status', 'active');
 
-      if (error) throw error;
-      setCommunityMembers(data || []);
+      if (membersError) throw membersError;
+
+      if (!members || members.length === 0) {
+        setCommunityMembers([]);
+        return;
+      }
+
+      // Then get membership details for those users
+      const userIds = members.map(m => m.user_id);
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('memberships')
+        .select('id, user_id, full_name, surname, email, region')
+        .in('user_id', userIds);
+
+      if (membershipError) throw membershipError;
+
+      // Combine the data
+      const enrichedMembers = members.map(member => ({
+        ...member,
+        member: membershipData?.find(m => m.user_id === member.user_id) || null
+      }));
+
+      setCommunityMembers(enrichedMembers);
     } catch (error) {
       console.error('Error fetching community members:', error);
     }
