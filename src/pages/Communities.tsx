@@ -497,8 +497,10 @@ export default function Communities() {
                   </div>
                   <div>
                     <CardTitle className="text-lg font-medium">{community.name}</CardTitle>
-                    <CardDescription className="text-xs font-light">
-                      {community.member_count} members
+                    <CardDescription className="text-xs font-light flex items-center gap-2">
+                      <span>{community.member_count} members</span>
+                      <span>•</span>
+                      <span className="capitalize">{community.privacy_setting}</span>
                     </CardDescription>
                   </div>
                 </div>
@@ -519,7 +521,7 @@ export default function Communities() {
                 </p>
               )}
 
-              {community.leader && (
+              {community.leader && community.leader_id && (
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
                   <div className="flex items-center space-x-2">
                     <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
