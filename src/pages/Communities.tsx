@@ -128,8 +128,7 @@ export default function Communities() {
       const { data: members, error: membersError } = await supabase
         .from('community_members')
         .select('*')
-        .eq('community_id', communityId)
-        .eq('status', 'active');
+        .eq('community_id', communityId);
 
       if (membersError) throw membersError;
 
@@ -221,7 +220,6 @@ export default function Communities() {
         community_id: selectedCommunity.id,
         user_id: memberId,
         role: 'member',
-        status: 'active',
         invited_by: user.id,
       }]);
 
@@ -326,7 +324,21 @@ export default function Communities() {
 
   const handleSetLeader = async (communityId: string, leaderId: string, leaderTitle: string) => {
     try {
-      const { error } = await supabase
+      // Get the user_id from the memberships table
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('memberships')
+        .select('user_id')
+        .eq('id', leaderId)
+        .single();
+
+      if (membershipError) throw membershipError;
+
+      if (!membershipData) {
+        throw new Error('Member not found');
+      }
+
+      // Update the community with the leader
+      const { error: updateError } = await supabase
         .from('communities')
         .update({
           leader_id: leaderId,
@@ -334,7 +346,37 @@ export default function Communities() {
         })
         .eq('id', communityId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // Add the leader to community_members if not already a member
+      const { error: memberError } = await supabase
+        .from('community_members')
+        .upsert([{
+          community_id: communityId,
+          user_id: membershipData.user_id,
+          role: 'member',
+          invited_by: user?.id
+        }], {
+          onConflict: 'community_id,user_id',
+          ignoreDuplicates: true
+        });
+
+      if (memberError && !memberError.message?.includes('duplicate')) {
+        throw memberError;
+      }
+
+      // Update member count
+      const { count } = await supabase
+        .from('community_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('community_id', communityId);
+
+      if (count !== null) {
+        await supabase
+          .from('communities')
+          .update({ member_count: count })
+          .eq('id', communityId);
+      }
 
       toast({
         title: 'Leader Assigned',
