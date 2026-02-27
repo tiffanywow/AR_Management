@@ -227,11 +227,6 @@ export default function Communities() {
 
       if (error) throw error;
 
-      await supabase
-        .from('communities')
-        .update({ member_count: selectedCommunity.member_count + 1 })
-        .eq('id', selectedCommunity.id);
-
       toast({
         title: 'Member Added',
         description: 'Member has been added to the community',
@@ -271,13 +266,6 @@ export default function Communities() {
         .eq('id', memberToDelete.id);
 
       if (error) throw error;
-
-      if (selectedCommunity) {
-        await supabase
-          .from('communities')
-          .update({ member_count: Math.max(0, selectedCommunity.member_count - 1) })
-          .eq('id', selectedCommunity.id);
-      }
 
       toast({
         title: 'Member Removed',
