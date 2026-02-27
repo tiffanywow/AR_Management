@@ -425,12 +425,9 @@ async function getUserCommunities(userId) {
         leader:leader_id(
           id,
           full_name,
-          phone,
-          memberships(
-            profiles(
-              full_name
-            )
-          )
+          surname,
+          phone_number,
+          email
         )
       )
     `)
@@ -453,13 +450,10 @@ async function getUserCommunities(userId) {
     "leader_contact": "+264811234567",
     "leader": {
       "id": "uuid",
-      "full_name": "John Doe",
-      "phone": "+264811234567",
-      "memberships": {
-        "profiles": {
-          "full_name": "John Doe"
-        }
-      }
+      "full_name": "John",
+      "surname": "Doe",
+      "phone_number": "+264811234567",
+      "email": "john.doe@example.com"
     }
   }
 ]
@@ -478,12 +472,9 @@ async function getCommunityDetails(communityId) {
       leader:leader_id(
         id,
         full_name,
-        phone,
-        memberships(
-          profiles(
-            full_name
-          )
-        )
+        surname,
+        phone_number,
+        email
       )
     `)
     .eq('id', communityId)
@@ -507,13 +498,10 @@ async function getCommunityDetails(communityId) {
   "created_at": "2025-01-15T10:00:00Z",
   "leader": {
     "id": "uuid",
-    "full_name": "John Doe",
-    "phone": "+264811234567",
-    "memberships": {
-      "profiles": {
-        "full_name": "John Doe"
-      }
-    }
+    "full_name": "John",
+    "surname": "Doe",
+    "phone_number": "+264811234567",
+    "email": "john.doe@example.com"
   }
 }
 ```
