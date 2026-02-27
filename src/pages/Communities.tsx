@@ -108,6 +108,22 @@ export default function Communities() {
 
   const fetchCommunityMembers = async (communityId: string) => {
     try {
+      // Also fetch the updated community data
+      const { data: communityData, error: communityError } = await supabase
+        .from('communities')
+        .select(`
+          *,
+          leader:leader_id(id, full_name, surname, phone_number, email)
+        `)
+        .eq('id', communityId)
+        .single();
+
+      if (communityError) throw communityError;
+
+      if (communityData) {
+        setSelectedCommunity(communityData);
+      }
+
       // First get community members
       const { data: members, error: membersError } = await supabase
         .from('community_members')
@@ -131,11 +147,15 @@ export default function Communities() {
 
       if (membershipError) throw membershipError;
 
-      // Combine the data
-      const enrichedMembers = members.map(member => ({
-        ...member,
-        member: membershipData?.find(m => m.user_id === member.user_id) || null
-      }));
+      // Combine the data and add member_id field
+      const enrichedMembers = members.map(member => {
+        const membershipInfo = membershipData?.find(m => m.user_id === member.user_id);
+        return {
+          ...member,
+          member_id: member.user_id,
+          member: membershipInfo || null
+        };
+      });
 
       setCommunityMembers(enrichedMembers);
     } catch (error) {
@@ -217,8 +237,8 @@ export default function Communities() {
         description: 'Member has been added to the community',
       });
 
-      fetchCommunityMembers(selectedCommunity.id);
-      fetchCommunities();
+      await fetchCommunityMembers(selectedCommunity.id);
+      await fetchCommunities();
     } catch (error: any) {
       if (error.message?.includes('duplicate')) {
         toast({
@@ -265,8 +285,8 @@ export default function Communities() {
       });
 
       if (selectedCommunity) {
-        fetchCommunityMembers(selectedCommunity.id);
-        fetchCommunities();
+        await fetchCommunityMembers(selectedCommunity.id);
+        await fetchCommunities();
       }
 
       setDeleteConfirmOpen(false);
@@ -321,7 +341,11 @@ export default function Communities() {
         description: 'Community leader has been set successfully',
       });
 
-      fetchCommunities();
+      await fetchCommunities();
+
+      if (selectedCommunity) {
+        await fetchCommunityMembers(selectedCommunity.id);
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -360,7 +384,12 @@ export default function Communities() {
         description: 'Community leader has been removed',
       });
 
-      fetchCommunities();
+      await fetchCommunities();
+
+      if (selectedCommunity) {
+        await fetchCommunityMembers(selectedCommunity.id);
+      }
+
       setDeleteConfirmOpen(false);
       setMemberToDelete(null);
     } catch (error: any) {
