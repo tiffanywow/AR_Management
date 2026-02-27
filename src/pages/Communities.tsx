@@ -514,31 +514,29 @@ export default function Communities() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {community.description && (
-                  <p className="text-sm text-gray-600 font-light line-clamp-2">
-                    {community.description}
-                  </p>
-                )}
+            <CardContent className="space-y-3 pb-4">
+              {community.description && (
+                <p className="text-sm text-gray-600 font-light line-clamp-2">
+                  {community.description}
+                </p>
+              )}
 
-                {community.leader && community.leader_id && (
-                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
-                      <p className="text-xs font-medium text-gray-700">{community.leader_title || 'Community Leader'}</p>
-                    </div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {community.leader.full_name} {community.leader.surname}
-                    </p>
-                    {community.leader.phone_number && (
-                      <p className="text-xs text-gray-600">{community.leader.phone_number}</p>
-                    )}
+              {community.leader && community.leader_id && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
+                    <p className="text-xs font-medium text-gray-700">{community.leader_title || 'Community Leader'}</p>
                   </div>
-                )}
-              </div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {community.leader.full_name} {community.leader.surname}
+                  </p>
+                  {community.leader.phone_number && (
+                    <p className="text-xs text-gray-600">{community.leader.phone_number}</p>
+                  )}
+                </div>
+              )}
 
-              <div className="flex items-center space-x-2 mt-3">
+              <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
