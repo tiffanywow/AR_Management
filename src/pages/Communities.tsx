@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown } from 'lucide-react';
@@ -58,6 +59,8 @@ export default function Communities() {
   const [availableMembers, setAvailableMembers] = useState<any[]>([]);
   const [leaderDialogOpen, setLeaderDialogOpen] = useState(false);
   const [selectedLeaderTitle, setSelectedLeaderTitle] = useState('Community Leader');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<{ id: string; name: string; isLeader: boolean } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -233,12 +236,19 @@ export default function Communities() {
     }
   };
 
-  const handleRemoveMember = async (membershipId: string) => {
+  const handleRemoveMemberClick = (membershipId: string, memberName: string, isLeader: boolean) => {
+    setMemberToDelete({ id: membershipId, name: memberName, isLeader });
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleRemoveMember = async () => {
+    if (!memberToDelete) return;
+
     try {
       const { error } = await supabase
         .from('community_members')
         .delete()
-        .eq('id', membershipId);
+        .eq('id', memberToDelete.id);
 
       if (error) throw error;
 
@@ -251,13 +261,16 @@ export default function Communities() {
 
       toast({
         title: 'Member Removed',
-        description: 'Member has been removed from the community',
+        description: `${memberToDelete.name} has been removed from the community`,
       });
 
       if (selectedCommunity) {
         fetchCommunityMembers(selectedCommunity.id);
         fetchCommunities();
       }
+
+      setDeleteConfirmOpen(false);
+      setMemberToDelete(null);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -318,6 +331,18 @@ export default function Communities() {
     }
   };
 
+  const handleRemoveLeaderClick = () => {
+    if (selectedCommunity?.leader) {
+      const leaderName = `${selectedCommunity.leader.full_name} ${selectedCommunity.leader.surname}`.trim();
+      setMemberToDelete({
+        id: selectedCommunity.id,
+        name: leaderName,
+        isLeader: true
+      });
+      setDeleteConfirmOpen(true);
+    }
+  };
+
   const handleRemoveLeader = async (communityId: string) => {
     try {
       const { error } = await supabase
@@ -336,6 +361,8 @@ export default function Communities() {
       });
 
       fetchCommunities();
+      setDeleteConfirmOpen(false);
+      setMemberToDelete(null);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -612,50 +639,59 @@ export default function Communities() {
             <div className="space-y-2">
               <Label>Current Members ({communityMembers.length})</Label>
               <div className="max-h-96 overflow-y-auto space-y-2">
-                {communityMembers.map((membership) => {
-                  const isLeader = selectedCommunity?.leader_id === membership.member_id;
-                  return (
-                    <div
-                      key={membership.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 bg-[#d1242a]/10 rounded-full flex items-center justify-center flex-shrink-0">
-                          {isLeader ? (
-                            <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
-                          ) : (
-                            <span className="text-xs font-medium text-[#d1242a]">
-                              {membership.member?.full_name?.charAt(0) || '?'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-medium text-gray-900">
-                              {membership.member?.full_name || 'Unknown'} {membership.member?.surname || ''}
-                            </p>
-                            {isLeader && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#d1242a] text-white">
-                                {selectedCommunity?.leader_title || 'Leader'}
+                {communityMembers
+                  .sort((a, b) => {
+                    const aIsLeader = selectedCommunity?.leader_id === a.member_id;
+                    const bIsLeader = selectedCommunity?.leader_id === b.member_id;
+                    if (aIsLeader && !bIsLeader) return -1;
+                    if (!aIsLeader && bIsLeader) return 1;
+                    return 0;
+                  })
+                  .map((membership) => {
+                    const isLeader = selectedCommunity?.leader_id === membership.member_id;
+                    const memberName = `${membership.member?.full_name || 'Unknown'} ${membership.member?.surname || ''}`.trim();
+                    return (
+                      <div
+                        key={membership.id}
+                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                      >
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 bg-[#d1242a]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                            {isLeader ? (
+                              <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
+                            ) : (
+                              <span className="text-xs font-medium text-[#d1242a]">
+                                {membership.member?.full_name?.charAt(0) || '?'}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500 font-light">
-                            {membership.member?.region || 'No region'} • {membership.role}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-gray-900">
+                                {memberName}
+                              </p>
+                              {isLeader && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#d1242a] text-white">
+                                  {selectedCommunity?.leader_title || 'Leader'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 font-light">
+                              {membership.member?.region || 'No region'} • {membership.role}
+                            </p>
+                          </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveMemberClick(membership.id, memberName, isLeader)}
+                          className="bg-gray-100 hover:bg-gray-200 flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveMember(membership.id)}
-                        className="bg-gray-100 hover:bg-gray-200 flex-shrink-0"
-                      >
-                        <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-                      </Button>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 {communityMembers.length === 0 && (
                   <p className="text-sm text-gray-500 text-center py-8 font-light">
                     No members yet. Add members using the dropdown above.
@@ -686,10 +722,8 @@ export default function Communities() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      if (selectedCommunity) {
-                        handleRemoveLeader(selectedCommunity.id);
-                        setLeaderDialogOpen(false);
-                      }
+                      handleRemoveLeaderClick();
+                      setLeaderDialogOpen(false);
                     }}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
@@ -739,6 +773,41 @@ export default function Communities() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {memberToDelete?.isLeader ? 'Remove Community Leader?' : 'Remove Member?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <span className="font-medium text-gray-900">{memberToDelete?.name}</span> from this community?
+              {memberToDelete?.isLeader && ' This will also remove their leader status.'}
+              {' '}This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteConfirmOpen(false);
+              setMemberToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (memberToDelete?.isLeader && selectedCommunity) {
+                  handleRemoveLeader(selectedCommunity.id);
+                } else {
+                  handleRemoveMember();
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
