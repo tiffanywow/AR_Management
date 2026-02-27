@@ -612,36 +612,50 @@ export default function Communities() {
             <div className="space-y-2">
               <Label>Current Members ({communityMembers.length})</Label>
               <div className="max-h-96 overflow-y-auto space-y-2">
-                {communityMembers.map((membership) => (
-                  <div
-                    key={membership.id}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-[#d1242a]/10 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-medium text-[#d1242a]">
-                          {membership.member?.full_name?.charAt(0) || '?'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {membership.member?.full_name || 'Unknown'} {membership.member?.surname || ''}
-                        </p>
-                        <p className="text-xs text-gray-500 font-light">
-                          {membership.member?.region || 'No region'} • {membership.role}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveMember(membership.id)}
-                      className="bg-gray-100 hover:bg-gray-200"
+                {communityMembers.map((membership) => {
+                  const isLeader = selectedCommunity?.leader_id === membership.member_id;
+                  return (
+                    <div
+                      key={membership.id}
+                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
                     >
-                      <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="w-8 h-8 bg-[#d1242a]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                          {isLeader ? (
+                            <Crown className="h-4 w-4 text-[#d1242a]" strokeWidth={1.5} />
+                          ) : (
+                            <span className="text-xs font-medium text-[#d1242a]">
+                              {membership.member?.full_name?.charAt(0) || '?'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-gray-900">
+                              {membership.member?.full_name || 'Unknown'} {membership.member?.surname || ''}
+                            </p>
+                            {isLeader && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#d1242a] text-white">
+                                {selectedCommunity?.leader_title || 'Leader'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 font-light">
+                            {membership.member?.region || 'No region'} • {membership.role}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveMember(membership.id)}
+                        className="bg-gray-100 hover:bg-gray-200 flex-shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                      </Button>
+                    </div>
+                  );
+                })}
                 {communityMembers.length === 0 && (
                   <p className="text-sm text-gray-500 text-center py-8 font-light">
                     No members yet. Add members using the dropdown above.
