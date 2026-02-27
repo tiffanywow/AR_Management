@@ -109,7 +109,7 @@ export default function Communities() {
         .from('community_members')
         .select(`
           *,
-          memberships:user_id(id, user_id, full_name, surname, email, region)
+          member:user_id(id, user_id, full_name, surname, email, region)
         `)
         .eq('community_id', communityId)
         .eq('status', 'active');
@@ -579,6 +579,9 @@ export default function Communities() {
                         {member.full_name} {member.surname} ({member.region || 'No region'})
                       </SelectItem>
                     ))}
+                  {availableMembers.filter(m => !communityMembers.find(cm => cm.user_id === m.user_id)).length === 0 && (
+                    <div className="p-2 text-sm text-gray-500 text-center">All members already added</div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -596,15 +599,15 @@ export default function Communities() {
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-[#d1242a]/10 rounded-full flex items-center justify-center">
                         <span className="text-xs font-medium text-[#d1242a]">
-                          {membership.memberships?.full_name?.charAt(0) || '?'}
+                          {membership.member?.full_name?.charAt(0) || '?'}
                         </span>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {membership.memberships?.full_name || 'Unknown'} {membership.memberships?.surname || ''}
+                          {membership.member?.full_name || 'Unknown'} {membership.member?.surname || ''}
                         </p>
                         <p className="text-xs text-gray-500 font-light">
-                          {membership.memberships?.region || 'No region'} • {membership.role}
+                          {membership.member?.region || 'No region'} • {membership.role}
                         </p>
                       </div>
                     </div>
