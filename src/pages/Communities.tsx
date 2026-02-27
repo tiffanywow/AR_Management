@@ -146,12 +146,12 @@ export default function Communities() {
 
       if (membershipError) throw membershipError;
 
-      // Combine the data and add member_id field
+      // Combine the data and add member_id field (should be memberships.id for leader comparison)
       const enrichedMembers = members.map(member => {
         const membershipInfo = membershipData?.find(m => m.user_id === member.user_id);
         return {
           ...member,
-          member_id: member.user_id,
+          member_id: membershipInfo?.id || null, // Use memberships.id instead of user_id
           member: membershipInfo || null
         };
       });
