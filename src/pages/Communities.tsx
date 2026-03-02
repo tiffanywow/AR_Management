@@ -152,6 +152,14 @@ export default function Communities() {
 
   const handleApproveRequest = async (requestId: string, communityId: string, userId: string) => {
     try {
+      // Check if user is already a member
+      const { data: existingMember } = await supabase
+        .from('community_members')
+        .select('id')
+        .eq('community_id', communityId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
       // Update request status
       const { error: updateError } = await supabase
         .from('community_join_requests')
@@ -164,17 +172,19 @@ export default function Communities() {
 
       if (updateError) throw updateError;
 
-      // Add user to community_members
-      const { error: memberError } = await supabase
-        .from('community_members')
-        .insert([{
-          community_id: communityId,
-          user_id: userId,
-          role: 'member',
-          invited_by: user?.id
-        }]);
+      // Add user to community_members only if not already a member
+      if (!existingMember) {
+        const { error: memberError } = await supabase
+          .from('community_members')
+          .insert([{
+            community_id: communityId,
+            user_id: userId,
+            role: 'member',
+            invited_by: user?.id
+          }]);
 
-      if (memberError) throw memberError;
+        if (memberError) throw memberError;
+      }
 
       // Update member count
       const { count } = await supabase
