@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown } from 'lucide-react';
+import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,6 +52,7 @@ export default function Communities() {
   const { user } = useAuth();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
@@ -205,6 +206,67 @@ export default function Communities() {
       toast({
         title: 'Error',
         description: error.message || 'Failed to create community',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCommunity = (community: Community) => {
+    setSelectedCommunity(community);
+    setFormData({
+      name: community.name,
+      description: community.description || '',
+      community_type: community.community_type || 'general',
+      privacy_setting: community.privacy_setting || 'public',
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateCommunity = async () => {
+    if (!selectedCommunity || !formData.name.trim()) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please enter a community name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('communities')
+        .update({
+          name: formData.name.trim(),
+          description: formData.description.trim() || null,
+          community_type: formData.community_type,
+          privacy_setting: formData.privacy_setting,
+        })
+        .eq('id', selectedCommunity.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Community Updated',
+        description: 'Your community has been updated successfully',
+      });
+
+      setEditDialogOpen(false);
+      setSelectedCommunity(null);
+      setFormData({
+        name: '',
+        description: '',
+        community_type: 'general',
+        privacy_setting: 'public',
+      });
+      fetchCommunities();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update community',
         variant: 'destructive',
       });
     } finally {
@@ -546,6 +608,81 @@ export default function Communities() {
         </Dialog>
       </div>
 
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Community</DialogTitle>
+            <DialogDescription>Update your community details</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Community Name <span className="text-red-500">*</span></Label>
+              <Input
+                placeholder="Enter community name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="What is this community about?"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="min-h-24"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Community Type</Label>
+                <Select
+                  value={formData.community_type}
+                  onValueChange={(value) => setFormData({ ...formData, community_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="regional">Regional</SelectItem>
+                    <SelectItem value="youth">Youth</SelectItem>
+                    <SelectItem value="women">Women</SelectItem>
+                    <SelectItem value="special_interest">Special Interest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Privacy</Label>
+                <Select
+                  value={formData.privacy_setting}
+                  onValueChange={(value) => setFormData({ ...formData, privacy_setting: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="private">Private</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button
+              className="w-full bg-[#d1242a] hover:bg-[#b91c1c]"
+              onClick={handleUpdateCommunity}
+              disabled={loading}
+            >
+              {loading ? 'Updating...' : 'Update Community'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardContent className="p-6">
@@ -602,14 +739,24 @@ export default function Communities() {
                     </CardDescription>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteCommunity(community.id)}
-                  className="bg-gray-100 hover:bg-gray-200"
-                >
-                  <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditCommunity(community)}
+                    className="bg-gray-100 hover:bg-gray-200"
+                  >
+                    <Pencil className="h-4 w-4" strokeWidth={1.5} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteCommunity(community.id)}
+                    className="bg-gray-100 hover:bg-gray-200"
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pb-4">
