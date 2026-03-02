@@ -574,7 +574,8 @@ export default function Communities() {
                       <SelectItem value="regional">Regional</SelectItem>
                       <SelectItem value="youth">Youth</SelectItem>
                       <SelectItem value="women">Women</SelectItem>
-                      <SelectItem value="special_interest">Special Interest</SelectItem>
+                      <SelectItem value="professionals">Professionals</SelectItem>
+                      <SelectItem value="interest_based">Interest Based</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -650,7 +651,8 @@ export default function Communities() {
                     <SelectItem value="regional">Regional</SelectItem>
                     <SelectItem value="youth">Youth</SelectItem>
                     <SelectItem value="women">Women</SelectItem>
-                    <SelectItem value="special_interest">Special Interest</SelectItem>
+                    <SelectItem value="professionals">Professionals</SelectItem>
+                    <SelectItem value="interest_based">Interest Based</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
