@@ -47,6 +47,27 @@ interface CommunityMember {
   joined_at: string;
 }
 
+interface JoinRequest {
+  id: string;
+  community_id: string;
+  user_id: string;
+  membership_id: string;
+  status: string;
+  message: string | null;
+  created_at: string;
+  community: {
+    name: string;
+    privacy_setting: string;
+  };
+  membership: {
+    full_name: string;
+    surname: string;
+    email: string;
+    phone_number: string;
+    region: string;
+  };
+}
+
 export default function Communities() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -62,6 +83,8 @@ export default function Communities() {
   const [selectedLeaderTitle, setSelectedLeaderTitle] = useState('Community Leader');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<{ id: string; name: string; isLeader: boolean } | null>(null);
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [requestsDialogOpen, setRequestsDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -73,6 +96,7 @@ export default function Communities() {
   useEffect(() => {
     fetchCommunities();
     fetchAvailableMembers();
+    fetchJoinRequests();
   }, []);
 
   const fetchCommunities = async () => {
@@ -104,6 +128,109 @@ export default function Communities() {
       setAvailableMembers(data || []);
     } catch (error) {
       console.error('Error fetching members:', error);
+    }
+  };
+
+  const fetchJoinRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('community_join_requests')
+        .select(`
+          *,
+          community:community_id(name, privacy_setting),
+          membership:membership_id(full_name, surname, email, phone_number, region)
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setJoinRequests(data || []);
+    } catch (error) {
+      console.error('Error fetching join requests:', error);
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string, communityId: string, userId: string) => {
+    try {
+      // Update request status
+      const { error: updateError } = await supabase
+        .from('community_join_requests')
+        .update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id
+        })
+        .eq('id', requestId);
+
+      if (updateError) throw updateError;
+
+      // Add user to community_members
+      const { error: memberError } = await supabase
+        .from('community_members')
+        .insert([{
+          community_id: communityId,
+          user_id: userId,
+          role: 'member',
+          invited_by: user?.id
+        }]);
+
+      if (memberError) throw memberError;
+
+      // Update member count
+      const { count } = await supabase
+        .from('community_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('community_id', communityId);
+
+      if (count !== null) {
+        await supabase
+          .from('communities')
+          .update({ member_count: count })
+          .eq('id', communityId);
+      }
+
+      toast({
+        title: 'Request Approved',
+        description: 'Member has been added to the community',
+      });
+
+      await fetchJoinRequests();
+      await fetchCommunities();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to approve request',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string, reason?: string) => {
+    try {
+      const { error } = await supabase
+        .from('community_join_requests')
+        .update({
+          status: 'rejected',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+          rejection_reason: reason || 'Request denied'
+        })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Request Rejected',
+        description: 'Join request has been denied',
+      });
+
+      await fetchJoinRequests();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reject request',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -723,6 +850,73 @@ export default function Communities() {
         </Card>
       </div>
 
+      {joinRequests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Join Requests</CardTitle>
+                <CardDescription>
+                  {joinRequests.length} pending {joinRequests.length === 1 ? 'request' : 'requests'} for private communities
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRequestsDialogOpen(true)}
+              >
+                View All
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {joinRequests.slice(0, 3).map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">
+                        {request.membership.full_name} {request.membership.surname}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {request.community.name}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 font-light mt-1">
+                      {request.membership.email} • {request.membership.region}
+                    </p>
+                    {request.message && (
+                      <p className="text-sm text-gray-600 italic mt-2">
+                        "{request.message}"
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => handleApproveRequest(request.id, request.community_id, request.user_id)}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRejectRequest(request.id)}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {communities.map((community) => (
           <Card key={community.id} className="hover:shadow-md transition-shadow">
@@ -1028,6 +1222,84 @@ export default function Communities() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={requestsDialogOpen} onOpenChange={setRequestsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Community Join Requests</DialogTitle>
+            <DialogDescription>
+              Review and manage pending requests to join private communities
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {joinRequests.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 font-light">No pending join requests</p>
+              </div>
+            ) : (
+              joinRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="border border-gray-200 rounded-lg p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-medium text-gray-900">
+                          {request.membership.full_name} {request.membership.surname}
+                        </h4>
+                        <Badge variant="secondary" className="text-xs">
+                          {request.community.name}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                        <div>
+                          <span className="font-light">Email:</span> {request.membership.email}
+                        </div>
+                        <div>
+                          <span className="font-light">Phone:</span> {request.membership.phone_number}
+                        </div>
+                        <div>
+                          <span className="font-light">Region:</span> {request.membership.region}
+                        </div>
+                        <div>
+                          <span className="font-light">Requested:</span>{' '}
+                          {new Date(request.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      {request.message && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded">
+                          <p className="text-sm text-gray-700 font-light italic">
+                            "{request.message}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => {
+                        handleApproveRequest(request.id, request.community_id, request.user_id);
+                      }}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRejectRequest(request.id)}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
