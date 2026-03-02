@@ -853,48 +853,51 @@ export default function Communities() {
       {joinRequests.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Join Requests</CardTitle>
-                <CardDescription>
-                  {joinRequests.length} pending {joinRequests.length === 1 ? 'request' : 'requests'} for private communities
-                </CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRequestsDialogOpen(true)}
-              >
-                View All
-              </Button>
-            </div>
+            <CardTitle>Pending Join Requests</CardTitle>
+            <CardDescription>
+              {joinRequests.length} {joinRequests.length === 1 ? 'request' : 'requests'} awaiting approval
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {joinRequests.slice(0, 3).map((request) => (
+            <div className="space-y-2">
+              {joinRequests.map((request) => (
                 <div
                   key={request.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-gray-900">
-                        {request.membership.full_name} {request.membership.surname}
-                      </p>
-                      <Badge variant="outline" className="text-xs">
-                        {request.community.name}
-                      </Badge>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-[#d1242a]/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium text-[#d1242a]">
+                          {request.membership.full_name.charAt(0)}{request.membership.surname.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-gray-900">
+                            {request.membership.full_name} {request.membership.surname}
+                          </p>
+                          <span className="text-gray-400">→</span>
+                          <Badge variant="secondary" className="text-xs bg-[#d1242a]/10 text-[#d1242a]">
+                            {request.community.name}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 font-light mt-0.5">
+                          <span>{request.membership.email}</span>
+                          <span>•</span>
+                          <span>{request.membership.region}</span>
+                          <span>•</span>
+                          <span>{new Date(request.created_at).toLocaleDateString()}</span>
+                        </div>
+                        {request.message && (
+                          <p className="text-xs text-gray-600 italic mt-1.5 line-clamp-2">
+                            "{request.message}"
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 font-light mt-1">
-                      {request.membership.email} • {request.membership.region}
-                    </p>
-                    {request.message && (
-                      <p className="text-sm text-gray-600 italic mt-2">
-                        "{request.message}"
-                      </p>
-                    )}
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                     <Button
                       size="sm"
                       className="bg-green-600 hover:bg-green-700"
@@ -916,6 +919,13 @@ export default function Communities() {
           </CardContent>
         </Card>
       )}
+
+      <Separator className="my-8" />
+
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold text-gray-900">All Communities</h2>
+        <p className="text-sm text-gray-600 font-light mt-1">Browse and manage community groups</p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {communities.map((community) => (
