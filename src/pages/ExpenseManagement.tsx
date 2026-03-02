@@ -109,6 +109,19 @@ export default function ExpenseManagement() {
         description: 'Expense record has been added and is pending approval',
       });
 
+        // also send role-based notifications to super_admin and finance
+        try {
+          await sendRoleNotification({
+            roles: ['super_admin', 'finance'],
+            type: 'expense_recorded',
+            title: 'Expense Added',
+            message: `${user?.email || user?.id} added an expense: ${formData.description} — ${formData.amount}`,
+            data: { amount: parseFloat(formData.amount), category: formData.category },
+          });
+        } catch (err) {
+          console.error('Failed to send role notification for expense:', err);
+        }
+
       setDialogOpen(false);
       setFormData({
         category: 'salaries',

@@ -33,6 +33,10 @@ export default function Settings() {
     messagingServiceSid: '',
   });
 
+  const twilioConfigured = Boolean(
+    twilioSettings.accountSid || twilioSettings.authToken || twilioSettings.messagingServiceSid
+  );
+
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     emailNotifications: true,
     newMemberAlerts: true,
@@ -162,53 +166,16 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Account SID</label>
-                <Input
-                  placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  value={twilioSettings.accountSid}
-                  onChange={(e) =>
-                    setTwilioSettings((prev) => ({ ...prev, accountSid: e.target.value }))
-                  }
-                />
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Twilio Status</label>
+                <p className="text-sm text-gray-600">
+                  {twilioConfigured ? (
+                    <span className="text-green-600 font-medium">Configured</span>
+                  ) : (
+                    <span className="text-gray-600">Not configured</span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 mt-2">API keys are hidden for security.</p>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Auth Token</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••••••••••••••••••••••••••"
-                  value={twilioSettings.authToken}
-                  onChange={(e) =>
-                    setTwilioSettings((prev) => ({ ...prev, authToken: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Messaging Service SID</label>
-                <Input
-                  placeholder="MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  value={twilioSettings.messagingServiceSid}
-                  onChange={(e) =>
-                    setTwilioSettings((prev) => ({ ...prev, messagingServiceSid: e.target.value }))
-                  }
-                />
-              </div>
-              <Button
-                className="w-full bg-[#d1242a] hover:bg-[#b91c1c]"
-                onClick={saveTwilioSettings}
-                disabled={savingTwilio}
-              >
-                {savingTwilio ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.5} />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                    Save Twilio Settings
-                  </>
-                )}
-              </Button>
             </CardContent>
           </Card>
 
@@ -223,20 +190,16 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Supabase URL</label>
-                <Input placeholder="https://your-project.supabase.co" disabled />
+                <p className="text-sm text-gray-600">Hidden for security</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Anon Key</label>
-                <Input type="password" placeholder="••••••••••••••••••••••••••••••••" disabled />
+                <p className="text-sm text-gray-600">Hidden for security</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Service Role Key</label>
-                <Input type="password" placeholder="••••••••••••••••••••••••••••••••" disabled />
+                <p className="text-sm text-gray-600">Hidden for security</p>
               </div>
-              <Button className="w-full bg-[#d1242a] hover:bg-[#b91c1c]" disabled>
-                <Save className="mr-2 h-4 w-4" strokeWidth={1.5} />
-                Save Database Settings
-              </Button>
             </CardContent>
           </Card>
         </div>

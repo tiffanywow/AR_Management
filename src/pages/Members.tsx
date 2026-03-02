@@ -346,12 +346,25 @@ export default function Members() {
       if (updateError) throw updateError;
 
       if (member.user_id) {
+        // legacy table expects email
         await supabase.from('notifications').insert([{
-          user_id: member.user_id,
+          user_id: member.email || member.user_id,
           title: 'Membership Approved!',
           message: `Congratulations! Your membership has been approved. Your membership number is ${membershipNumber}.`,
           type: 'membership_approved',
           data: { membership_number: membershipNumber },
+          is_read: false,
+        }]);
+        // also write to push_notifications for dashboard realtime
+        // ensure push notification type is allowed (fallback to general)
+        const pushType = ['new_post','new_poll','new_campaign','campaign_update','general'].includes('membership_approved') ? 'membership_approved' : 'general';
+        await supabase.from('push_notifications').insert([{
+          user_id: member.user_id,
+          notification_type: pushType,
+          title: 'Membership Approved!',
+          body: `Congratulations! Your membership has been approved. Your membership number is ${membershipNumber}.`,
+          data: { membership_number: membershipNumber, original_type: 'membership_approved' },
+          related_id: null,
           is_read: false,
         }]);
       }
@@ -397,11 +410,21 @@ export default function Members() {
       const member = members.find(m => m.id === memberId);
       if (member?.user_id) {
         await supabase.from('notifications').insert([{
-          user_id: member.user_id,
+          user_id: member.email || member.user_id,
           title: 'Membership Application Update',
           message: 'Your membership application has been declined. Please contact support for more information.',
           type: 'membership_rejected',
           data: {},
+          is_read: false,
+        }]);
+        const pushType2 = ['new_post','new_poll','new_campaign','campaign_update','general'].includes('membership_rejected') ? 'membership_rejected' : 'general';
+        await supabase.from('push_notifications').insert([{
+          user_id: member.user_id,
+          notification_type: pushType2,
+          title: 'Membership Application Update',
+          body: 'Your membership application has been declined. Please contact support for more information.',
+          data: { original_type: 'membership_rejected' },
+          related_id: null,
           is_read: false,
         }]);
       }
@@ -1215,7 +1238,7 @@ export default function Members() {
                     fill="#8884d8"
                     dataKey="value"
                     labelLine={false}
-                    label={({ name, percent }) => percent > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                    label={(entry: any) => entry.percent > 0 ? `${entry.name}: ${(entry.percent * 100).toFixed(0)}%` : ''}
                   >
                     {ageData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

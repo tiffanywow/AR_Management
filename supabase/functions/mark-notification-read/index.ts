@@ -38,17 +38,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // update both legacy and push tables
     let query = supabase
       .from('notifications')
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('user_id', user_email);
 
+    let queryPush = supabase
+      .from('push_notifications')
+      .update({ is_read: true, read_at: new Date().toISOString() })
+      .innerJoin('profiles', 'profiles.id', 'push_notifications.user_id')
+      .eq('profiles.email', user_email);
+
     // Mark specific notification or all notifications
     if (!mark_all && notification_id) {
       query = query.eq('id', notification_id);
+      queryPush = queryPush.eq('push_notifications.id', notification_id);
     }
 
-    const { data, error } = await query.select();
+    const [{ data, error }, { error: pushErr }] = await Promise.all([query.select(), queryPush]);
 
     if (error) {
       return new Response(
@@ -59,6 +67,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    const updatedCount = data?.length || 0;
 
     return new Response(
       JSON.stringify({ 

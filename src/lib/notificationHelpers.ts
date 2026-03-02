@@ -10,10 +10,16 @@ export interface NotificationParams {
 }
 
 export const notificationHelpers = {
+  // helper for mapping arbitrary types into allowed push_notification types
+  _mapPushType(type: string) {
+    const allowed = ['new_post','new_poll','new_campaign','campaign_update','general'];
+    return allowed.includes(type) ? type : 'general';
+  },
+
   async notifyPaymentReceived(userId: string, amount: number, paymentId: string, reference?: string) {
     return await supabase.from('push_notifications').insert({
       user_id: userId,
-      notification_type: 'payment_received',
+      notification_type: this._mapPushType('payment_received'),
       title: 'Payment Received',
       body: `Your payment of N$${amount.toFixed(2)} has been confirmed.`,
       data: { amount, reference },
@@ -56,7 +62,7 @@ export const notificationHelpers = {
   async notifyBroadcastLike(authorId: string, likerName: string, broadcastId: string) {
     return await supabase.from('push_notifications').insert({
       user_id: authorId,
-      notification_type: 'broadcast_like',
+      notification_type: this._mapPushType('broadcast_like'),
       title: 'New Like on Your Post',
       body: `${likerName} liked your post`,
       data: { liker_name: likerName },
@@ -82,7 +88,7 @@ export const notificationHelpers = {
   async notifyCampaignUpdate(memberIds: string[], campaignName: string, updateMessage: string, campaignId: string) {
     const notifications = memberIds.map(user_id => ({
       user_id,
-      notification_type: 'campaign_update',
+      notification_type: this._mapPushType('campaign_update'),
       title: `Campaign Update: ${campaignName}`,
       body: updateMessage,
       related_id: campaignId,
@@ -96,7 +102,7 @@ export const notificationHelpers = {
   async notifyMembershipApproved(userId: string, membershipNumber: string, membershipId: string) {
     return await supabase.from('push_notifications').insert({
       user_id: userId,
-      notification_type: 'membership_approved',
+      notification_type: this._mapPushType('membership_approved'),
       title: 'Membership Approved!',
       body: `Welcome to the party! Your membership number is ${membershipNumber}.`,
       data: { membership_number: membershipNumber },
@@ -109,7 +115,7 @@ export const notificationHelpers = {
   async notifyMembershipRejected(userId: string, reason: string, membershipId: string) {
     return await supabase.from('push_notifications').insert({
       user_id: userId,
-      notification_type: 'membership_rejected',
+      notification_type: this._mapPushType('membership_rejected'),
       title: 'Membership Application',
       body: `Your application has been reviewed. ${reason}`,
       data: { reason },
@@ -122,7 +128,7 @@ export const notificationHelpers = {
   async notifyApprovalRequired(adminIds: string[], title: string, body: string, relatedId?: string) {
     const notifications = adminIds.map(user_id => ({
       user_id,
-      notification_type: 'approval_required',
+      notification_type: this._mapPushType('approval_required'),
       title,
       body,
       related_id: relatedId,
@@ -134,9 +140,10 @@ export const notificationHelpers = {
   },
 
   async notifyGeneral(userIds: string[], title: string, body: string, type: string = 'info', relatedId?: string) {
+    const pushType = this._mapPushType(type);
     const notifications = userIds.map(user_id => ({
       user_id,
-      notification_type: type,
+      notification_type: pushType,
       title,
       body,
       related_id: relatedId,

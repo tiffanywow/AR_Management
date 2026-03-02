@@ -234,7 +234,14 @@ export default function RegionalAuthority() {
         if (error) throw error;
         toast.success('Regional authority updated successfully');
       } else {
-        if (error) throw error;
+        const { data: inserted, error: insertError } = await supabase
+          .from('regional_authorities')
+          .insert([authorityData])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
         toast.success('Regional authority created successfully');
 
         await sendRoleNotification({
