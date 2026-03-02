@@ -108,6 +108,11 @@ Deno.serve(async (req: Request) => {
           JSON.stringify({ error: 'You already have a pending request for this community' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      } else if (existingRequest.status === 'approved') {
+        return new Response(
+          JSON.stringify({ error: 'Your request was already approved. You should be a member.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       } else if (existingRequest.status === 'rejected') {
         return new Response(
           JSON.stringify({ error: 'Your previous request was rejected' }),
