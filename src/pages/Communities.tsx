@@ -588,7 +588,7 @@ export default function Communities() {
 
   const handleRemoveLeaderClick = () => {
     if (selectedCommunity?.leader) {
-      const leaderName = `${selectedCommunity.leader.full_name} ${selectedCommunity.leader.surname}`.trim();
+      const leaderName = `${selectedCommunity.leader.full_name || 'Unknown'} ${selectedCommunity.leader.surname || ''}`.trim();
       setMemberToDelete({
         id: selectedCommunity.id,
         name: leaderName,
@@ -869,13 +869,13 @@ export default function Communities() {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-[#d1242a]/10 rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-sm font-medium text-[#d1242a]">
-                          {request.membership.full_name.charAt(0)}{request.membership.surname.charAt(0)}
+                          {request.membership?.full_name?.charAt(0) || '?'}{request.membership?.surname?.charAt(0) || ''}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-gray-900">
-                            {request.membership.full_name} {request.membership.surname}
+                            {request.membership?.full_name || 'Unknown'} {request.membership?.surname || ''}
                           </p>
                           <span className="text-gray-400">→</span>
                           <Badge variant="secondary" className="text-xs bg-[#d1242a]/10 text-[#d1242a]">
@@ -883,9 +883,9 @@ export default function Communities() {
                           </Badge>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500 font-light mt-0.5">
-                          <span>{request.membership.email}</span>
+                          <span>{request.membership?.email || 'N/A'}</span>
                           <span>•</span>
-                          <span>{request.membership.region}</span>
+                          <span>{request.membership?.region || 'No region'}</span>
                           <span>•</span>
                           <span>{new Date(request.created_at).toLocaleDateString()}</span>
                         </div>
@@ -979,7 +979,7 @@ export default function Communities() {
                     <p className="text-xs font-medium text-gray-700">{community.leader_title || 'Community Leader'}</p>
                   </div>
                   <p className="text-sm font-medium text-gray-900">
-                    {community.leader.full_name} {community.leader.surname}
+                    {community.leader.full_name || 'Unknown'} {community.leader.surname || ''}
                   </p>
                   {community.leader.phone_number && (
                     <p className="text-xs text-gray-600">{community.leader.phone_number}</p>
@@ -1048,7 +1048,7 @@ export default function Communities() {
                     .filter(m => !communityMembers.find(cm => cm.user_id === m.user_id))
                     .map((member) => (
                       <SelectItem key={member.id} value={member.user_id}>
-                        {member.full_name} {member.surname} ({member.region || 'No region'})
+                        {member.full_name || 'Unknown'} {member.surname || ''} ({member.region || 'No region'})
                       </SelectItem>
                     ))}
                   {availableMembers.filter(m => !communityMembers.find(cm => cm.user_id === m.user_id)).length === 0 && (
@@ -1155,7 +1155,7 @@ export default function Communities() {
                   </Button>
                 </div>
                 <p className="text-sm font-medium text-gray-900">
-                  {selectedCommunity.leader.full_name} {selectedCommunity.leader.surname}
+                  {selectedCommunity.leader.full_name || 'Unknown'} {selectedCommunity.leader.surname || ''}
                 </p>
                 <p className="text-xs text-gray-600">{selectedCommunity.leader_title || 'Community Leader'}</p>
               </div>
@@ -1188,7 +1188,7 @@ export default function Communities() {
                 <SelectContent>
                   {availableMembers.map((member) => (
                     <SelectItem key={member.id} value={member.id}>
-                      {member.full_name} {member.surname} ({member.region || 'No region'})
+                      {member.full_name || 'Unknown'} {member.surname || ''} ({member.region || 'No region'})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1256,21 +1256,21 @@ export default function Communities() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-medium text-gray-900">
-                          {request.membership.full_name} {request.membership.surname}
+                          {request.membership?.full_name || 'Unknown'} {request.membership?.surname || ''}
                         </h4>
                         <Badge variant="secondary" className="text-xs">
-                          {request.community.name}
+                          {request.community?.name || 'Unknown Community'}
                         </Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
                         <div>
-                          <span className="font-light">Email:</span> {request.membership.email}
+                          <span className="font-light">Email:</span> {request.membership?.email || 'N/A'}
                         </div>
                         <div>
-                          <span className="font-light">Phone:</span> {request.membership.phone_number}
+                          <span className="font-light">Phone:</span> {request.membership?.phone_number || 'N/A'}
                         </div>
                         <div>
-                          <span className="font-light">Region:</span> {request.membership.region}
+                          <span className="font-light">Region:</span> {request.membership?.region || 'N/A'}
                         </div>
                         <div>
                           <span className="font-light">Requested:</span>{' '}
