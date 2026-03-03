@@ -11,7 +11,7 @@ CREATE POLICY "Administrators can create notifications"
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM profiles
-      WHERE profiles.id::text = auth.uid()
+      WHERE profiles.id::text = auth.uid()::text
       AND profiles.role IN ('super_admin', 'administrator')
       AND profiles.is_active = true
     )

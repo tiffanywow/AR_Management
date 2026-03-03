@@ -2,6 +2,9 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 
+const uuidRegex =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 export interface Notification {
   id: string;
   user_id: string;
@@ -47,57 +50,55 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const resolveProfileUuid = useCallback(async (): Promise<string | null> => {
+    if (!profile?.id && !profile?.email) return null;
+    if (profile?.id && uuidRegex.test(profile.id)) return profile.id;
+
+    const email = profile?.email || (profile?.id?.includes('@') ? profile.id : null);
+    if (!email) return null;
+
+    const { data: maybe, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (error) {
+      console.warn('NotificationContext: cannot resolve profile uuid', error);
+      return null;
+    }
+
+    const maybeId = maybe?.id as unknown as string | undefined;
+    if (maybeId && uuidRegex.test(maybeId)) return maybeId;
+    return null;
+  }, [profile?.id, profile?.email]);
+
   const fetchNotifications = useCallback(async () => {
-    if (!profile?.id || !profile?.email) return;
+    if (!profile?.id && !profile?.email) return;
 
     setLoading(true);
     try {
-      // determine what ID to use when talking to push_notifications
-      let pushId: string | null = profile.id;
-      if (pushId.includes('@')) {
-        // profile.id looks like an email; attempt to resolve actual uuid in case the
-        // database row was mis‑created. if we can't find one, leave pushId null so
-        // we skip the push table entirely (legacy records will still surface).
-        const { data: maybe } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', profile.id)
-          .single();
-        if (maybe?.id && !maybe.id.includes('@')) {
-          pushId = maybe.id;
-        } else {
-          console.warn('NotificationContext: profile.id is not a uuid, skipping push fetch', profile.id);
-          pushId = null;
-        }
-      }
+      const userUuid = await resolveProfileUuid();
+      if (!userUuid) return;
 
-      // fetch from both push_notifications (uuid user_id) and legacy notifications (text user_id/email)
+      // fetch from both push_notifications and notifications (both uuid user_id)
       const [pushResult, legacyResult] = await Promise.all([
-        pushId
-          ? supabase
-              .from('push_notifications')
-              .select('*')
-              .eq('user_id', pushId)
-              .order('created_at', { ascending: false })
-              .limit(50)
-          : Promise.resolve({ data: [], error: null }),
+        supabase
+          .from('push_notifications')
+          .select('*')
+          .eq('user_id', userUuid)
+          .order('created_at', { ascending: false })
+          .limit(50),
         supabase
           .from('notifications')
           .select('*')
-          // notifications.user_id stores email rather than uuid
-          .eq('user_id', profile.email)
+          .eq('user_id', userUuid)
           .order('created_at', { ascending: false })
           .limit(50),
       ]);
 
-      if (pushResult.error) {
-        console.error('push notifications fetch error', pushResult.error);
-        throw pushResult.error;
-      }
-      if (legacyResult.error) {
-        console.error('legacy notifications fetch error', legacyResult.error);
-        throw legacyResult.error;
-      }
+      if (pushResult.error) console.error('push notifications fetch error', pushResult.error);
+      if (legacyResult.error) console.error('notifications fetch error', legacyResult.error);
 
       const pushData = pushResult.data || [];
       const legacyData = (legacyResult.data || []).map((n: any) => ({
@@ -126,7 +127,7 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
     } finally {
       setLoading(false);
     }
-  }, [profile?.id, profile?.email]);
+  }, [profile?.id, profile?.email, resolveProfileUuid]);
 
   const markAsRead = async (notificationId: string) => {
     try {
@@ -151,33 +152,23 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
     }
   };
   const markAllAsRead = async () => {
-    if (!profile?.id) return;
+    const userUuid = await resolveProfileUuid();
+    if (!userUuid) return;
 
     try {
       const now = new Date().toISOString();
-      if (!profile.id.includes('@')) {
-        await Promise.all([
-          supabase
-            .from('push_notifications')
-            .update({ is_read: true, read_at: now })
-            .eq('user_id', profile.id)
-            .eq('is_read', false),
-          supabase
-            .from('notifications')
-            .update({ is_read: true, read_at: now })
-            // notifications.user_id is email
-            .eq('user_id', profile.email || '')
-            .eq('is_read', false),
-        ]);
-      } else {
-        // only legacy table available
-        await supabase
+      await Promise.all([
+        supabase
+          .from('push_notifications')
+          .update({ is_read: true, read_at: now })
+          .eq('user_id', userUuid)
+          .eq('is_read', false),
+        supabase
           .from('notifications')
           .update({ is_read: true, read_at: now })
-          // notifications.user_id is email
-          .eq('user_id', profile.email || '')
-          .eq('is_read', false);
-      }
+          .eq('user_id', userUuid)
+          .eq('is_read', false),
+      ]);
 
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: now })));
       setUnreadCount(0);
@@ -192,29 +183,16 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
   }, [onNotificationPopup]);
 
   useEffect(() => {
-    if (!profile?.id || !profile?.email) return;
+    if (!profile?.id && !profile?.email) return;
 
     let pushChannel: any = null;
+    let notificationsChannel: any = null;
 
     const init = async () => {
       // refresh first
       await fetchNotifications();
 
-      // determine subscription id (uuid)
-      let subId: string | null = profile.id;
-      if (subId.includes('@')) {
-        const { data: maybe } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', subId)
-          .single();
-        if (maybe?.id && !maybe.id.includes('@')) {
-          subId = maybe.id;
-        } else {
-          console.warn('NotificationContext: cannot subscribe to push channel because profile.id is invalid', subId);
-          subId = null;
-        }
-      }
+      const subId = await resolveProfileUuid();
 
       if (subId) {
         pushChannel = supabase
@@ -257,86 +235,88 @@ export function NotificationProvider({ children, onNotificationPopup }: Notifica
             }
           )
           .subscribe();
+
+        notificationsChannel = supabase
+          .channel(`notifications:${subId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${subId}`,
+            },
+            (payload) => {
+              const n = payload.new as any;
+              const newNotification: Notification = {
+                id: n.id,
+                user_id: n.user_id,
+                notification_type: n.type,
+                title: n.title,
+                body: n.message,
+                data: n.data,
+                related_id: null,
+                is_read: n.is_read,
+                read_at: n.read_at,
+                sent_at: null,
+                created_at: n.created_at,
+              };
+
+              setNotifications(prev => [newNotification, ...prev]);
+              setUnreadCount(prev => prev + 1);
+              showPopup(newNotification);
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${subId}`,
+            },
+            (payload) => {
+              const n = payload.new as any;
+              const updatedNotification: Notification = {
+                id: n.id,
+                user_id: n.user_id,
+                notification_type: n.type,
+                title: n.title,
+                body: n.message,
+                data: n.data,
+                related_id: null,
+                is_read: n.is_read,
+                read_at: n.read_at,
+                sent_at: null,
+                created_at: n.created_at,
+              };
+
+              setNotifications(prev =>
+                prev.map(x => x.id === updatedNotification.id ? updatedNotification : x)
+              );
+
+              if (updatedNotification.is_read) {
+                setUnreadCount(prev => Math.max(0, prev - 1));
+              }
+            }
+          )
+          .subscribe();
       }
     };
 
     init();
-
-    const legacyChannel = supabase
-      .channel(`notifications_legacy:${profile.email}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${profile.email}`,
-        },
-        (payload) => {
-          const n = payload.new as any;
-          const newNotification: Notification = {
-            id: n.id,
-            user_id: n.user_id,
-            notification_type: n.type,
-            title: n.title,
-            body: n.message,
-            data: n.data,
-            related_id: null,
-            is_read: n.is_read,
-            read_at: n.read_at,
-            sent_at: null,
-            created_at: n.created_at,
-          };
-
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          showPopup(newNotification);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${profile.email}`,
-        },
-        (payload) => {
-          const n = payload.new as any;
-          const updatedNotification: Notification = {
-            id: n.id,
-            user_id: n.user_id,
-            notification_type: n.type,
-            title: n.title,
-            body: n.message,
-            data: n.data,
-            related_id: null,
-            is_read: n.is_read,
-            read_at: n.read_at,
-            sent_at: null,
-            created_at: n.created_at,
-          };
-
-          setNotifications(prev =>
-            prev.map(x => x.id === updatedNotification.id ? updatedNotification : x)
-          );
-
-          if (updatedNotification.is_read) {
-            setUnreadCount(prev => Math.max(0, prev - 1));
-          }
-        }
-      )
-      .subscribe();
 
     return () => {
       if (pushChannel) {
         pushChannel.unsubscribe();
         supabase.removeChannel(pushChannel);
       }
-      legacyChannel.unsubscribe();
-      supabase.removeChannel(legacyChannel);
+      if (notificationsChannel) {
+        notificationsChannel.unsubscribe();
+        supabase.removeChannel(notificationsChannel);
+      }
     };
-  }, [profile?.id, profile?.email, fetchNotifications, showPopup]);
+  }, [profile?.id, profile?.email, fetchNotifications, showPopup, resolveProfileUuid]);
 
   return (
     <NotificationContext.Provider

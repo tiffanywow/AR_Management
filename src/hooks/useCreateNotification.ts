@@ -8,103 +8,79 @@ export interface CreateNotificationParams {
   data?: Record<string, any>;
 }
 
+const uuidRegex =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+async function resolveUserUuid(userIdOrEmail: string | null): Promise<string | null> {
+  if (!userIdOrEmail) return null;
+  if (uuidRegex.test(userIdOrEmail)) return userIdOrEmail;
+
+  if (userIdOrEmail.includes('@')) {
+    const { data: profileByEmail, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', userIdOrEmail)
+      .single();
+
+    if (error) {
+      console.warn('useCreateNotification: unable to resolve email to UUID', userIdOrEmail, error);
+      return null;
+    }
+
+    const maybeId = profileByEmail?.id as unknown as string | undefined;
+    if (maybeId && uuidRegex.test(maybeId)) return maybeId;
+
+    console.warn('useCreateNotification: resolved profile.id is not a UUID', maybeId);
+    return null;
+  }
+
+  console.warn('useCreateNotification: user_id is neither UUID nor email', userIdOrEmail);
+  return null;
+}
+
 export function useCreateNotification() {
   const createNotification = async (params: CreateNotificationParams) => {
     try {
-      // insert into legacy notifications table (expecting email in user_id)
-      let legacyUserId = params.user_id;
-      // if it looks like a UUID (no @ symbol) fetch corresponding email
-      if (legacyUserId && !legacyUserId.includes('@')) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', legacyUserId)
-          .single();
-        if (profileData?.email) {
-          legacyUserId = profileData.email;
-        } else {
-          console.warn(
-            'useCreateNotification: unable to resolve UUID to email for legacy notification, skipping legacy insert',
-            params.user_id
-          );
-          legacyUserId = null;
-        }
+      const targetUserId = await resolveUserUuid(params.user_id);
+      if (!targetUserId) {
+        throw new Error('useCreateNotification: could not resolve target user UUID');
       }
-      let data = null;
-      let error = null;
-      if (legacyUserId) {
-        const result = await supabase
-          .from('notifications')
-          .insert({
-            user_id: legacyUserId,
-            type: params.notification_type,
-            title: params.title,
-            message: params.body,
-            data: params.data || null,
-            is_read: false,
-          })
-          .select()
-          .single();
-        data = result.data;
-        error = result.error;
-      } else {
-        // skip legacy insert when we don't have a valid email
-      }
+
+      const notificationsResult = await supabase
+        .from('notifications')
+        .insert({
+          user_id: targetUserId,
+          type: params.notification_type,
+          title: params.title,
+          message: params.body,
+          data: params.data || null,
+          is_read: false,
+        })
+        .select()
+        .single();
 
 
       // also insert into push_notifications for dashboard/real-time
-      // make sure user_id is a uuid; if caller passed email, look up the id
-      let pushUserId = params.user_id;
-      if (pushUserId && pushUserId.includes('@')) {
-        const { data: profileByEmail } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', pushUserId)
-          .single();
-        if (profileByEmail?.id) {
-          // ensure the ID we got is actually a UUID (the profiles table should normally store uuids)
-          const maybeId = profileByEmail.id;
-          const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-          if (uuidRegex.test(maybeId)) {
-            pushUserId = maybeId;
-          } else {
-            console.warn(
-              'useCreateNotification: profile.id is not a valid uuid, skipping push insert for',
-              maybeId
-            );
-            pushUserId = null;
-          }
-        } else {
-          console.warn(
-            'useCreateNotification: unable to resolve email to UUID for push notification, skipping push insert',
-            params.user_id
-          );
-          pushUserId = null; // clear so we don't try to insert invalid value
-        }
-      }
+      const pushUserId = targetUserId;
       const allowed = ['new_post','new_poll','new_campaign','campaign_update','general'];
       const pushType = allowed.includes(params.notification_type) ? params.notification_type : 'general';
-      let pushError = null;
-      if (pushUserId) {
-        const result = await supabase
-          .from('push_notifications')
-          .insert({
-            user_id: pushUserId,
-            notification_type: pushType,
-            title: params.title,
-            body: params.body,
-            data: params.data || null,
-            related_id: null,
-            is_read: false,
-          });
-        pushError = result.error;
-      }
+      const pushResult = await supabase
+        .from('push_notifications')
+        .insert({
+          user_id: pushUserId,
+          notification_type: pushType,
+          title: params.title,
+          body: params.body,
+          data: params.data || null,
+          related_id: null,
+          is_read: false,
+        });
 
 
-      if (error) throw error;
-      if (pushError) console.error('push notification creation error', pushError);
+      if (notificationsResult.error) throw notificationsResult.error;
+      if (pushResult.error) console.error('push notification creation error', pushResult.error);
 
-      return { success: true, data };
+      return { success: true, data: notificationsResult.data };
     } catch (error) {
       console.error('Error creating notification:', error);
       return { success: false, error };
@@ -117,7 +93,32 @@ export function useCreateNotification() {
   ) => {
     try {
       const now = new Date().toISOString();
-      const notifications = user_ids.map(user_id => ({
+      const uuids = user_ids.filter((u) => uuidRegex.test(u));
+      const emails = user_ids.filter((u) => u.includes('@'));
+
+      const emailToUuid = new Map<string, string>();
+      if (emails.length) {
+        const { data: profilesByEmail, error } = await supabase
+          .from('profiles')
+          .select('id,email')
+          .in('email', emails);
+        if (error) {
+          console.warn('createBulkNotifications: unable to resolve emails to UUIDs', error);
+        } else {
+          (profilesByEmail || []).forEach((p: any) => {
+            if (p?.email && p?.id && uuidRegex.test(p.id)) {
+              emailToUuid.set(p.email, p.id);
+            }
+          });
+        }
+      }
+
+      const resolvedUserUuids = [
+        ...uuids,
+        ...emails.map((e) => emailToUuid.get(e)).filter((x): x is string => Boolean(x)),
+      ];
+
+      const notifications = resolvedUserUuids.map((user_id) => ({
         user_id,
         type: notification.notification_type,
         title: notification.title,
@@ -127,42 +128,18 @@ export function useCreateNotification() {
         created_at: now,
       }));
 
-      // translate any email addresses to UUIDs for push table
-      const pushNotifications = [] as any[];
-      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-      for (let user_id of user_ids) {
-        let pushUser = user_id;
-        if (pushUser && pushUser.includes('@')) {
-          const { data: profileByEmail } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', pushUser)
-            .single();
-          if (profileByEmail?.id) {
-            if (uuidRegex.test(profileByEmail.id)) {
-              pushUser = profileByEmail.id;
-            } else {
-              console.warn('createBulkNotifications: profile.id is not uuid, skipping push insert for', profileByEmail.id);
-              pushUser = null;
-            }
-          } else {
-            console.warn('createBulkNotifications: skipping push insert for unknown email', pushUser);
-            pushUser = null;
-          }
-        }
-        if (pushUser) {
-          pushNotifications.push({
-            user_id: pushUser,
-            notification_type: notification.notification_type,
-            title: notification.title,
-            body: notification.body,
-            data: notification.data || null,
-            related_id: null,
-            is_read: false,
-            created_at: now,
-          });
-        }
-      }
+      const allowed = ['new_post','new_poll','new_campaign','campaign_update','general'];
+      const pushType = allowed.includes(notification.notification_type) ? notification.notification_type : 'general';
+      const pushNotifications = resolvedUserUuids.map((user_id) => ({
+        user_id,
+        notification_type: pushType,
+        title: notification.title,
+        body: notification.body,
+        data: notification.data || null,
+        related_id: null,
+        is_read: false,
+        created_at: now,
+      }));
 
       const [{ data, error }, { error: pushError }] = await Promise.all([
         supabase.from('notifications').insert(notifications).select(),
