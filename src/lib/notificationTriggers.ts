@@ -35,11 +35,10 @@ export async function sendRoleNotification({
             return; // No users to notify
         }
 
-        // 2. Prepare bulk insert payload for legacy notifications table
+        // 2. Prepare bulk insert payload for notifications table (uuid user_id)
         const now = new Date().toISOString();
         const notificationsToInsert = profiles.map((profile) => ({
-            // legacy notifications table stores email for user_id
-            user_id: profile.email || profile.id,
+            user_id: profile.id,
             type: type,
             title,
             message: message, // changed from 'body'
