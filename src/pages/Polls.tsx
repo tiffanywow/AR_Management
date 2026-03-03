@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,11 +45,13 @@ interface Poll {
 export default function Polls() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [communities, setCommunities] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
   const [editingPollStatus, setEditingPollStatus] = useState<string | null>(null);
   const [closePollId, setClosePollId] = useState<string | null>(null);
@@ -68,6 +71,11 @@ export default function Polls() {
     fetchPolls();
     fetchCommunities();
   }, []);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   const fetchPolls = async () => {
     try {
@@ -424,9 +432,16 @@ export default function Polls() {
     }
   };
 
-  const draftPolls = polls.filter(p => p.status === 'draft');
-  const activePolls = polls.filter(p => p.status === 'active');
-  const closedPolls = polls.filter(p => p.status === 'closed');
+  const filteredPolls = polls.filter(p => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+    const hay = `${p.question} ${p.description ?? ''}`.toLowerCase();
+    return hay.includes(q);
+  });
+
+  const draftPolls = filteredPolls.filter(p => p.status === 'draft');
+  const activePolls = filteredPolls.filter(p => p.status === 'active');
+  const closedPolls = filteredPolls.filter(p => p.status === 'closed');
 
   return (
     <div className="space-y-8">
@@ -435,6 +450,14 @@ export default function Polls() {
           <h1 className="text-2xl font-semibold text-gray-900">Polls</h1>
           <p className="text-gray-600 font-light">Create polls and gather feedback from members</p>
         </div>
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Input
+              placeholder="Search polls..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) resetForm();
@@ -732,6 +755,7 @@ export default function Polls() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

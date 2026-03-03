@@ -1,5 +1,4 @@
-import { Search, User, LogOut, ShieldAlert } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { User, LogOut, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
@@ -11,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import NotificationsDropdown from './NotificationsDropdown';
+import GlobalSearch from './GlobalSearch';
 
 export default function Header() {
   const { profile, signOut, devRoleOverride, setDevRoleOverride } = useAuth();
@@ -25,13 +25,7 @@ export default function Header() {
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4 flex-1">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" strokeWidth={1.5} />
-            <Input
-              className="pl-10 border-gray-200 focus:border-gray-400 focus:ring-gray-400"
-              placeholder="Search..."
-            />
-          </div>
+          <GlobalSearch />
         </div>
 
         <div className="flex items-center space-x-4">

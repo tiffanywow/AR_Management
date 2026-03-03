@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +51,9 @@ interface CommunityMember {
 export default function Communities() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
@@ -72,6 +75,11 @@ export default function Communities() {
     fetchCommunities();
     fetchAvailableMembers();
   }, []);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   const fetchCommunities = async () => {
     try {
@@ -374,6 +382,12 @@ export default function Communities() {
 
   const totalMembers = communities.reduce((sum, c) => sum + c.member_count, 0);
   const activeCommunities = communities.filter(c => c.status === 'active').length;
+  const filteredCommunities = communities.filter(c => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+    const hay = `${c.name} ${c.description ?? ''} ${c.community_type ?? ''}`.toLowerCase();
+    return hay.includes(q);
+  });
 
   return (
     <div className="space-y-8">
@@ -382,6 +396,14 @@ export default function Communities() {
           <h1 className="text-2xl font-semibold text-gray-900">Communities</h1>
           <p className="text-gray-600 font-light">Create and manage member communities</p>
         </div>
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Input
+              placeholder="Search communities..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-[#d1242a] hover:bg-[#b91c1c]">
@@ -461,6 +483,7 @@ export default function Communities() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -502,7 +525,7 @@ export default function Communities() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {communities.map((community) => (
+        {filteredCommunities.map((community) => (
           <Card key={community.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -581,12 +604,16 @@ export default function Communities() {
         ))}
       </div>
 
-      {communities.length === 0 && (
+      {filteredCommunities.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" strokeWidth={1.5} />
-            <p className="text-gray-600">No communities yet</p>
-            <p className="text-sm text-gray-500 mt-1 font-light">Create your first community to organize members</p>
+            <p className="text-gray-600">No communities found</p>
+            <p className="text-sm text-gray-500 mt-1 font-light">
+              {searchTerm.trim()
+                ? 'Try a different search term.'
+                : 'Create your first community to organize members'}
+            </p>
           </CardContent>
         </Card>
       )}

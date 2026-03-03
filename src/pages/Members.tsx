@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,6 +65,7 @@ interface Member {
 
 export default function Members() {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -100,6 +102,11 @@ export default function Members() {
     fetchMembers();
     fetchRegionClassifications();
   }, []);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   const fetchRegionClassifications = async () => {
     try {
