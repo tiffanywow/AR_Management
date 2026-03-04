@@ -13,6 +13,7 @@ import { Plus, TrendingDown, DollarSign, FileText, Calendar, ArrowLeft, Search, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Expense {
   id: string;
@@ -107,6 +108,19 @@ export default function ExpenseManagement() {
         title: 'Expense Added',
         description: 'Expense record has been added and is pending approval',
       });
+
+        // also send role-based notifications to super_admin and finance
+        try {
+          await sendRoleNotification({
+            roles: ['super_admin', 'finance'],
+            type: 'expense_recorded',
+            title: 'Expense Added',
+            message: `${user?.email || user?.id} added an expense: ${formData.description} — ${formData.amount}`,
+            data: { amount: parseFloat(formData.amount), category: formData.category },
+          });
+        } catch (err) {
+          console.error('Failed to send role notification for expense:', err);
+        }
 
       setDialogOpen(false);
       setFormData({

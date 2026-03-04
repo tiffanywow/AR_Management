@@ -35,20 +35,37 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Build query
-    let query = supabase
+    // fetch from legacy notifications table
+    let query1 = supabase
       .from('notifications')
       .select('*')
       .eq('user_id', userEmail)
       .order('created_at', { ascending: false })
       .limit(limit);
-
-    // Filter for unread only if requested
     if (unreadOnly) {
-      query = query.eq('is_read', false);
+      query1 = query1.eq('is_read', false);
     }
 
-    const { data: notifications, error } = await query;
+    // also fetch from push_notifications by joining with profiles to map email->uuid
+    let query2 = supabase
+      .from('push_notifications')
+      .select('push_notifications.*')
+      .limit(limit)
+      .order('created_at', { ascending: false })
+      .innerJoin('profiles', 'profiles.id', 'push_notifications.user_id')
+      .eq('profiles.email', userEmail);
+    if (unreadOnly) {
+      query2 = query2.eq('push_notifications.is_read', false);
+    }
+
+    const [{ data: n1, error: err1 }, { data: n2, error: err2 }] = await Promise.all([query1, query2]);
+
+    if (err1) throw err1;
+    if (err2) throw err2;
+
+    const notifications = [...(n1 || []), ...(n2 || [])].sort((a: any, b: any) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    ).slice(0, limit);
 
     if (error) {
       return new Response(

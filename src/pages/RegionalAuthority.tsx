@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2, MapPin, Users, Map } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import RegionalAuthorityMap from '@/components/RegionalAuthorityMap';
 import LocationPicker from '@/components/LocationPicker';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface RegionalAuthority {
   id: string;
@@ -233,12 +234,22 @@ export default function RegionalAuthority() {
         if (error) throw error;
         toast.success('Regional authority updated successfully');
       } else {
-        const { error } = await supabase
+        const { data: inserted, error: insertError } = await supabase
           .from('regional_authorities')
-          .insert(authorityData);
+          .insert([authorityData])
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (insertError) throw insertError;
+
         toast.success('Regional authority created successfully');
+
+        await sendRoleNotification({
+          roles: ['super_admin', 'administrator'],
+          type: 'regional_authority_created',
+          title: 'New Regional Authority',
+          message: `Regional Authority "${authorityData.name}" has been created.`,
+        });
       }
 
       fetchAuthorities();
@@ -551,39 +562,39 @@ export default function RegionalAuthority() {
                 </CardHeader>
                 <CardContent className="pt-3">
                   <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setSelectedAuthority(authority.id)}
-                >
-                  View Details
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setEditingAuthority(authority);
-                    setSelectedLocation(authority.latitude && authority.longitude ? {
-                      latitude: authority.latitude,
-                      longitude: authority.longitude,
-                      locationName: authority.location_name || ''
-                    } : null);
-                    setShowAuthorityDialog(true);
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="bg-gray-100 hover:bg-gray-200"
-                  onClick={() => handleDeleteAuthority(authority.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setSelectedAuthority(authority.id)}
+                    >
+                      View Details
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingAuthority(authority);
+                        setSelectedLocation(authority.latitude && authority.longitude ? {
+                          latitude: authority.latitude,
+                          longitude: authority.longitude,
+                          locationName: authority.location_name || ''
+                        } : null);
+                        setShowAuthorityDialog(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="bg-gray-100 hover:bg-gray-200"
+                      onClick={() => handleDeleteAuthority(authority.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>

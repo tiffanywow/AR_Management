@@ -12,6 +12,7 @@ import { Plus, TrendingUp, DollarSign, FileText, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Revenue {
   id: string;
@@ -99,6 +100,13 @@ export default function RevenueManagement() {
       ]);
 
       if (error) throw error;
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'finance'],
+        type: 'revenue_added',
+        title: 'New Revenue Recorded',
+        message: `N$${parseFloat(formData.amount).toLocaleString()} added from ${getSourceLabel(formData.source)}.`,
+      });
 
       toast({
         title: 'Revenue Added',

@@ -12,6 +12,7 @@ import { Plus, Edit, Trash2, Save, Building2, Target, Award, Users, Phone, Mail,
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface General {
   id: string;
@@ -188,6 +189,14 @@ export default function PartyManagement() {
 
       if (error) throw error;
       toast({ title: 'Success', description: 'General information updated' });
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'party_info_updated',
+        title: 'Party Information Updated',
+        message: 'The general party information has been updated.',
+      });
+
       fetchGeneral();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });

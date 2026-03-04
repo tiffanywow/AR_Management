@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { Plus, Package, ShoppingCart, Tag, Edit, Trash2, Eye, AlertCircle } from 'lucide-react';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Category {
   id: string;
@@ -264,6 +265,13 @@ export default function Store() {
 
         if (error) throw error;
         toast.success('Product created successfully');
+
+        await sendRoleNotification({
+          roles: ['super_admin', 'administrator'],
+          type: 'store_product_created',
+          title: 'Store Product Created',
+          message: `A new product "${productData.name}" has been added to the store.`,
+        });
       }
 
       fetchProducts();
@@ -286,6 +294,14 @@ export default function Store() {
 
       if (error) throw error;
       toast.success('Product deleted successfully');
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator'],
+        type: 'store_product_deleted',
+        title: 'Store Product Deleted',
+        message: `A product has been removed from the store.`,
+      });
+
       fetchProducts();
     } catch (error: any) {
       toast.error('Error deleting product: ' + error.message);

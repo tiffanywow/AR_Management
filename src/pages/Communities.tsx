@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +10,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+<<<<<<< HEAD
 import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, Crown, Pencil } from 'lucide-react';
+=======
+import { Plus, Users, MessageSquare, BarChart3, UserPlus, Trash2, XCircle, Crown } from 'lucide-react';
+>>>>>>> c65b8414a9402fa4da77803b675022235dfab342
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Community {
   id: string;
@@ -71,7 +77,9 @@ interface JoinRequest {
 export default function Communities() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -79,6 +87,7 @@ export default function Communities() {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [communityMembers, setCommunityMembers] = useState<any[]>([]);
   const [availableMembers, setAvailableMembers] = useState<any[]>([]);
+  const [selectedForAddition, setSelectedForAddition] = useState<string[]>([]);
   const [leaderDialogOpen, setLeaderDialogOpen] = useState(false);
   const [selectedLeaderTitle, setSelectedLeaderTitle] = useState('Community Leader');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -98,6 +107,11 @@ export default function Communities() {
     fetchAvailableMembers();
     fetchJoinRequests();
   }, []);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   const fetchCommunities = async () => {
     try {
@@ -133,6 +147,7 @@ export default function Communities() {
 
   const fetchJoinRequests = async () => {
     try {
+<<<<<<< HEAD
       const { data, error } = await supabase
         .from('community_join_requests')
         .select(`
@@ -271,17 +286,36 @@ export default function Communities() {
       if (membersError) throw membersError;
 
       if (!members || members.length === 0) {
+=======
+      // First get the community members
+      const { data: membersData, error: membersError } = await supabase
+        .from('community_members')
+        .select('*')
+        .eq('community_id', communityId)
+        .eq('status', 'active');
+
+      if (membersError) throw membersError;
+
+      if (!membersData || membersData.length === 0) {
+>>>>>>> c65b8414a9402fa4da77803b675022235dfab342
         setCommunityMembers([]);
         return;
       }
 
+<<<<<<< HEAD
       // Then get membership details for those users
       const userIds = members.map(m => m.user_id);
       const { data: membershipData, error: membershipError } = await supabase
+=======
+      // Then get their membership details
+      const userIds = membersData.map(m => m.user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+>>>>>>> c65b8414a9402fa4da77803b675022235dfab342
         .from('memberships')
         .select('id, user_id, full_name, surname, email, region')
         .in('user_id', userIds);
 
+<<<<<<< HEAD
       if (membershipError) throw membershipError;
 
       // Combine the data and add member_id field (should be memberships.id for leader comparison)
@@ -295,6 +329,17 @@ export default function Communities() {
       });
 
       setCommunityMembers(enrichedMembers);
+=======
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const combinedData = membersData.map(member => ({
+        ...member,
+        memberships: profilesData?.find(p => p.user_id === member.user_id) || null
+      }));
+
+      setCommunityMembers(combinedData);
+>>>>>>> c65b8414a9402fa4da77803b675022235dfab342
     } catch (error) {
       console.error('Error fetching community members:', error);
     }
@@ -326,6 +371,13 @@ export default function Communities() {
 
       if (error) throw error;
 
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'community_created',
+        title: 'New Community Created',
+        message: `A new community "${formData.name.trim()}" has been created.`,
+      });
+
       toast({
         title: 'Community Created',
         description: 'Your community has been created successfully',
@@ -350,6 +402,7 @@ export default function Communities() {
     }
   };
 
+<<<<<<< HEAD
   const handleEditCommunity = (community: Community) => {
     setSelectedCommunity(community);
     setFormData({
@@ -413,43 +466,50 @@ export default function Communities() {
 
   const handleAddMemberToCommunity = async (memberId: string) => {
     if (!selectedCommunity || !user) return;
+=======
+  const handleAddMultipleMembers = async () => {
+    if (!selectedCommunity || !user || selectedForAddition.length === 0) return;
+>>>>>>> c65b8414a9402fa4da77803b675022235dfab342
 
+    setLoading(true);
     try {
-      const { error } = await supabase.from('community_members').insert([{
+      const inserts = selectedForAddition.map(memberId => ({
         community_id: selectedCommunity.id,
         user_id: memberId,
         role: 'member',
         invited_by: user.id,
-      }]);
+      }));
+
+      const { error } = await supabase.from('community_members').insert(inserts);
 
       if (error) throw error;
 
       await supabase
         .from('communities')
-        .update({ member_count: selectedCommunity.member_count + 1 })
+        .update({ member_count: selectedCommunity.member_count + inserts.length })
         .eq('id', selectedCommunity.id);
 
       toast({
-        title: 'Member Added',
-        description: 'Member has been added to the community',
+        title: 'Members Added',
+        description: `${inserts.length} member(s) added successfully`,
       });
 
+<<<<<<< HEAD
       await fetchCommunityMembers(selectedCommunity.id);
       await fetchCommunities();
+=======
+      setSelectedForAddition([]);
+      fetchCommunityMembers(selectedCommunity.id);
+      fetchCommunities();
+>>>>>>> c65b8414a9402fa4da77803b675022235dfab342
     } catch (error: any) {
-      if (error.message?.includes('duplicate')) {
-        toast({
-          title: 'Already a Member',
-          description: 'This person is already in the community',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to add member',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add members',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -505,6 +565,13 @@ export default function Communities() {
         .eq('id', communityId);
 
       if (error) throw error;
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'community_deleted',
+        title: 'Community Deleted',
+        message: 'A community has been deleted.',
+      });
 
       toast({
         title: 'Community Deleted',
@@ -644,6 +711,7 @@ export default function Communities() {
 
   const handleViewMembers = (community: Community) => {
     setSelectedCommunity(community);
+    setSelectedForAddition([]);
     fetchCommunityMembers(community.id);
     setMembersDialogOpen(true);
   };
@@ -656,6 +724,12 @@ export default function Communities() {
 
   const totalMembers = communities.reduce((sum, c) => sum + c.member_count, 0);
   const activeCommunities = communities.filter(c => c.status === 'active').length;
+  const filteredCommunities = communities.filter(c => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+    const hay = `${c.name} ${c.description ?? ''} ${c.community_type ?? ''}`.toLowerCase();
+    return hay.includes(q);
+  });
 
   return (
     <div className="space-y-8">
@@ -664,6 +738,14 @@ export default function Communities() {
           <h1 className="text-2xl font-semibold text-gray-900">Communities</h1>
           <p className="text-gray-600 font-light">Create and manage member communities</p>
         </div>
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Input
+              placeholder="Search communities..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-[#d1242a] hover:bg-[#b91c1c]">
@@ -744,6 +826,7 @@ export default function Communities() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -938,7 +1021,7 @@ export default function Communities() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {communities.map((community) => (
+        {filteredCommunities.map((community) => (
           <Card key={community.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -1029,12 +1112,16 @@ export default function Communities() {
         ))}
       </div>
 
-      {communities.length === 0 && (
+      {filteredCommunities.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" strokeWidth={1.5} />
-            <p className="text-gray-600">No communities yet</p>
-            <p className="text-sm text-gray-500 mt-1 font-light">Create your first community to organize members</p>
+            <p className="text-gray-600">No communities found</p>
+            <p className="text-sm text-gray-500 mt-1 font-light">
+              {searchTerm.trim()
+                ? 'Try a different search term.'
+                : 'Create your first community to organize members'}
+            </p>
           </CardContent>
         </Card>
       )}
@@ -1047,6 +1134,7 @@ export default function Communities() {
           </DialogHeader>
 
           <div className="space-y-4">
+<<<<<<< HEAD
             <div className="space-y-2">
               <Label>Add Member</Label>
               <Select onValueChange={handleAddMemberToCommunity}>
@@ -1066,6 +1154,60 @@ export default function Communities() {
                   )}
                 </SelectContent>
               </Select>
+=======
+            <div className="space-y-4">
+              <Label>Add Members</Label>
+              <div className="flex gap-2 items-start">
+                <Select
+                  value=""
+                  onValueChange={(val) => {
+                    if (val && !selectedForAddition.includes(val)) {
+                      setSelectedForAddition([...selectedForAddition, val]);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select members to add..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMembers
+                      .filter(m => !communityMembers.find(cm => cm.user_id === m.user_id))
+                      .filter(m => !selectedForAddition.includes(m.user_id))
+                      .map((member) => (
+                        <SelectItem key={member.id} value={member.user_id}>
+                          {member.full_name} {member.surname} ({member.region || 'No region'})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAddMultipleMembers}
+                  disabled={selectedForAddition.length === 0 || loading}
+                  className="bg-[#d1242a] hover:bg-[#b91c1c] shrink-0"
+                >
+                  {loading ? 'Adding...' : `Add ${selectedForAddition.length} Member(s)`}
+                </Button>
+              </div>
+
+              {selectedForAddition.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 p-3 bg-gray-50 border rounded-md">
+                  {selectedForAddition.map(id => {
+                    const member = availableMembers.find(m => m.user_id === id);
+                    return (
+                      <Badge key={id} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                        {member?.full_name} {member?.surname}
+                        <button
+                          className="hover:bg-gray-200 rounded-full p-0.5 ml-1"
+                          onClick={() => setSelectedForAddition(selectedForAddition.filter(v => v !== id))}
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+>>>>>>> c65b8414a9402fa4da77803b675022235dfab342
             </div>
 
             <Separator className="my-4" />

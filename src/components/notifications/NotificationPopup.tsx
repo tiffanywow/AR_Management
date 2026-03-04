@@ -146,7 +146,7 @@ export default function NotificationPopup({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700"
+                className="h-6 w-6 p-0 flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-red-500 hover:text-red-700"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleClose();

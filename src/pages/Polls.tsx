@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
 
@@ -43,10 +45,13 @@ interface Poll {
 export default function Polls() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [communities, setCommunities] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
   const [editingPollStatus, setEditingPollStatus] = useState<string | null>(null);
   const [closePollId, setClosePollId] = useState<string | null>(null);
@@ -66,6 +71,11 @@ export default function Polls() {
     fetchPolls();
     fetchCommunities();
   }, []);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   const fetchPolls = async () => {
     try {
@@ -125,6 +135,7 @@ export default function Polls() {
       target_communities: Array.isArray(poll.target_communities) ? poll.target_communities : [],
     });
     setOptionInputs(poll.options.map(opt => opt.text));
+    setStartDate(poll.scheduled_start ? new Date(poll.scheduled_start) : null);
     setDialogOpen(true);
   };
 
@@ -140,6 +151,7 @@ export default function Polls() {
     });
     setOptionInputs(['', '']);
     setCustomDateRange(undefined);
+    setStartDate(null);
   };
 
   const handleSavePoll = async (broadcast: boolean) => {
@@ -218,8 +230,8 @@ export default function Polls() {
         pollData.created_by = user.id;
 
         if (broadcast) {
-          let startDate: Date;
-          let endDate: Date;
+          let start: Date;
+          let end: Date;
 
           if (formData.duration_days === 'custom') {
             if (!customDateRange?.from) {
@@ -228,15 +240,16 @@ export default function Polls() {
             if (!customDateRange?.to) {
               throw new Error('Please select an end date');
             }
-            startDate = customDateRange.from;
-            endDate = customDateRange.to;
+            start = customDateRange.from;
+            end = customDateRange.to;
           } else {
-            startDate = new Date();
-            endDate = addDays(new Date(), parseInt(formData.duration_days));
+            const baseStart = startDate || new Date();
+            start = baseStart;
+            end = addDays(baseStart, parseInt(formData.duration_days));
           }
 
-          pollData.scheduled_start = startDate.toISOString();
-          pollData.scheduled_end = endDate.toISOString();
+          pollData.scheduled_start = start.toISOString();
+          pollData.scheduled_end = end.toISOString();
         }
       }
 
@@ -292,6 +305,15 @@ export default function Polls() {
           : 'You can broadcast this poll later from the drafts section';
       }
 
+      if (broadcast) {
+        await sendRoleNotification({
+          roles: ['super_admin', 'administrator', 'communications_officer'],
+          type: 'poll_created',
+          title: 'New Poll Broadcasted',
+          message: `A new poll "${formData.question.trim()}" is now live.`,
+        });
+      }
+
       toast({
         title: toastTitle,
         description: toastDescription,
@@ -330,6 +352,13 @@ export default function Polls() {
 
       if (error) throw error;
 
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'poll_created',
+        title: 'New Poll Broadcasted',
+        message: `A new poll "${poll.question}" is now live.`,
+      });
+
       toast({
         title: 'Poll Broadcasted',
         description: 'Your poll is now live and collecting responses',
@@ -355,6 +384,13 @@ export default function Polls() {
         .eq('id', closePollId);
 
       if (error) throw error;
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'poll_closed',
+        title: 'Poll Closed',
+        message: 'A poll has been closed.',
+      });
 
       toast({
         title: 'Poll Closed',
@@ -396,9 +432,16 @@ export default function Polls() {
     }
   };
 
-  const draftPolls = polls.filter(p => p.status === 'draft');
-  const activePolls = polls.filter(p => p.status === 'active');
-  const closedPolls = polls.filter(p => p.status === 'closed');
+  const filteredPolls = polls.filter(p => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+    const hay = `${p.question} ${p.description ?? ''}`.toLowerCase();
+    return hay.includes(q);
+  });
+
+  const draftPolls = filteredPolls.filter(p => p.status === 'draft');
+  const activePolls = filteredPolls.filter(p => p.status === 'active');
+  const closedPolls = filteredPolls.filter(p => p.status === 'closed');
 
   return (
     <div className="space-y-8">
@@ -407,6 +450,14 @@ export default function Polls() {
           <h1 className="text-2xl font-semibold text-gray-900">Polls</h1>
           <p className="text-gray-600 font-light">Create polls and gather feedback from members</p>
         </div>
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Input
+              placeholder="Search polls..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) resetForm();
@@ -487,6 +538,65 @@ export default function Polls() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <Label>Poll Start Date (when broadcast)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !startDate && 'text-gray-500'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                        {startDate ? format(startDate, 'LLL dd, y') : 'Starts today'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate ?? new Date()}
+                        onSelect={(date) => setStartDate(date ?? null)}
+                        initialFocus
+                        classNames={{
+                          day: cn(
+                            buttonVariants({ variant: 'ghost' }),
+                            'h-8 w-8 p-0 font-normal bg-[#d1242a] text-white border border-[#d1242a] hover:bg-[#b91c1c] hover:text-white'
+                          ),
+                          day_today:
+                            '!bg-[#000000] !text-white font-extrabold !border-2 !border-white hover:!bg-[#b91c1c] hover:!text-white',
+                          day_selected:
+                            '!bg-white !text-[#d1242a] font-semibold hover:!bg-white hover:!text-[#b91c1c] !border-2 !border-[#d1242a]',
+                          day_outside:
+                            'bg-gray-200 text-white opacity-40 !border-transparent cursor-not-allowed',
+                          day_disabled:
+                            'bg-gray-300 text-white opacity-60 cursor-not-allowed hover:bg-gray-300 border border-gray-400',
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {formData.duration_days && formData.duration_days !== 'custom' && (
+                    <div className="mt-3 p-2.5 bg-gray-50 border border-gray-200 rounded-lg space-y-1">
+                      <div className="text-xs text-left">
+                        <span className="text-gray-600 font-medium">Start Date:</span>{' '}
+                        <span className="text-gray-900">
+                          {format(startDate ?? new Date(), 'LLL dd, y')}
+                        </span>
+                      </div>
+                      <div className="text-xs text-left">
+                        <span className="text-gray-600 font-medium">End Date:</span>{' '}
+                        <span className="text-gray-900">
+                          {format(
+                            addDays(startDate ?? new Date(), parseInt(formData.duration_days)),
+                            'LLL dd, y'
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <Label>Duration (when broadcast)</Label>
                   <Select
                     value={formData.duration_days}
@@ -507,32 +617,6 @@ export default function Polls() {
                       <SelectItem value="14">2 Weeks</SelectItem>
                       <SelectItem value="30">1 Month</SelectItem>
                       <SelectItem value="custom">Custom Date</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.duration_days && formData.duration_days !== 'custom' && (
-                    <div className="mt-3 p-2.5 bg-gray-50 border border-gray-200 rounded-lg space-y-1">
-                      <div className="text-xs text-left">
-                        <span className="text-gray-600 font-medium">Start Date:</span> <span className="text-gray-900">{format(new Date(), 'LLL dd, y')}</span>
-                      </div>
-                      <div className="text-xs text-left">
-                        <span className="text-gray-600 font-medium">End Date:</span> <span className="text-gray-900">{format(addDays(new Date(), parseInt(formData.duration_days)), 'LLL dd, y')}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Poll Type</Label>
-                  <Select
-                    value={formData.poll_type}
-                    onValueChange={(value) => setFormData({ ...formData, poll_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="single">Single Choice</SelectItem>
-                      <SelectItem value="multiple">Multiple Choice</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -671,6 +755,7 @@ export default function Polls() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

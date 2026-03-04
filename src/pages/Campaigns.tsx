@@ -8,6 +8,7 @@ import { Target, Plus, DollarSign, Users, Calendar, TrendingUp, Trash2 } from 'l
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 interface Campaign {
   id: string;
@@ -63,6 +64,13 @@ export default function Campaigns() {
         .eq('id', campaignId);
 
       if (error) throw error;
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'campaign_deleted',
+        title: 'Campaign Deleted',
+        message: 'A campaign has been deleted.',
+      });
 
       toast({
         title: 'Campaign Deleted',

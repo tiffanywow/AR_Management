@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { Search, Filter, Download, UserPlus, CheckCircle, XCircle, Eye, MapPin, 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { sendRoleNotification } from '@/lib/notificationTriggers';
 
 const COLORS = ['#d1242a', '#ef4444', '#f87171', '#fca5a5'];
 
@@ -63,6 +65,7 @@ interface Member {
 
 export default function Members() {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -99,6 +102,11 @@ export default function Members() {
     fetchMembers();
     fetchRegionClassifications();
   }, []);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   const fetchRegionClassifications = async () => {
     try {
@@ -344,16 +352,36 @@ export default function Members() {
 
       if (updateError) throw updateError;
 
-      if (member.email) {
+      if (member.user_id) {
+        // legacy table expects email
         await supabase.from('notifications').insert([{
-          user_id: member.email,
+          user_id: member.email || member.user_id,
           title: 'Membership Approved!',
           message: `Congratulations! Your membership has been approved. Your membership number is ${membershipNumber}.`,
           type: 'membership_approved',
           data: { membership_number: membershipNumber },
           is_read: false,
         }]);
+        // also write to push_notifications for dashboard realtime
+        // ensure push notification type is allowed (fallback to general)
+        const pushType = ['new_post','new_poll','new_campaign','campaign_update','general'].includes('membership_approved') ? 'membership_approved' : 'general';
+        await supabase.from('push_notifications').insert([{
+          user_id: member.user_id,
+          notification_type: pushType,
+          title: 'Membership Approved!',
+          body: `Congratulations! Your membership has been approved. Your membership number is ${membershipNumber}.`,
+          data: { membership_number: membershipNumber, original_type: 'membership_approved' },
+          related_id: null,
+          is_read: false,
+        }]);
       }
+
+      await sendRoleNotification({
+        roles: ['super_admin', 'administrator', 'communications_officer'],
+        type: 'member_approved',
+        title: 'Member Approved',
+        message: `Membership for ${member.full_name} ${member.surname} has been approved.`,
+      });
 
       toast({
         title: 'Member Approved',
@@ -387,15 +415,34 @@ export default function Members() {
       if (updateError) throw updateError;
 
       const member = members.find(m => m.id === memberId);
-      if (member) {
+      if (member?.user_id) {
         await supabase.from('notifications').insert([{
-          user_id: member.email,
+          user_id: member.email || member.user_id,
           title: 'Membership Application Update',
           message: 'Your membership application has been declined. Please contact support for more information.',
           type: 'membership_rejected',
           data: {},
           is_read: false,
         }]);
+        const pushType2 = ['new_post','new_poll','new_campaign','campaign_update','general'].includes('membership_rejected') ? 'membership_rejected' : 'general';
+        await supabase.from('push_notifications').insert([{
+          user_id: member.user_id,
+          notification_type: pushType2,
+          title: 'Membership Application Update',
+          body: 'Your membership application has been declined. Please contact support for more information.',
+          data: { original_type: 'membership_rejected' },
+          related_id: null,
+          is_read: false,
+        }]);
+      }
+
+      if (member) {
+        await sendRoleNotification({
+          roles: ['super_admin', 'administrator', 'communications_officer'],
+          type: 'member_declined',
+          title: 'Member Declined',
+          message: `Membership application for ${member.full_name} ${member.surname} has been declined.`,
+        });
       }
 
       toast({
@@ -1161,13 +1208,13 @@ export default function Members() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={regionData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="region" 
+                  <XAxis
+                    dataKey="region"
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 12, fill: '#64748b' }}
                   />
-                  <YAxis 
+                  <YAxis
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 12, fill: '#64748b' }}
@@ -1193,10 +1240,12 @@ export default function Members() {
                     data={ageData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius={110}
+                    innerRadius={60}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}%`}
+                    labelLine={false}
+                    label={(entry: any) => entry.percent > 0 ? `${entry.name}: ${(entry.percent * 100).toFixed(0)}%` : ''}
                   >
                     {ageData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
