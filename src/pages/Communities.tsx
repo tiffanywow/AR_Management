@@ -74,7 +74,27 @@ export default function Communities() {
   useEffect(() => {
     fetchCommunities();
     fetchAvailableMembers();
-  }, []);
+
+    // Subscribe to real-time community_members changes
+    const communityMembersSubscription = supabase
+      .channel('community_members_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'community_members' },
+        () => {
+          console.log('Community members changed, refreshing...');
+          if (selectedCommunity) {
+            fetchCommunityMembers(selectedCommunity.id);
+          }
+          fetchCommunities();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      communityMembersSubscription.unsubscribe();
+    };
+  }, [selectedCommunity]);
 
   useEffect(() => {
     const q = searchParams.get('q');
@@ -224,20 +244,32 @@ export default function Communities() {
 
       if (error) throw error;
 
-      await supabase
+      // Update member count
+      const updatedMemberCount = selectedCommunity.member_count + inserts.length;
+      const updateError = await supabase
         .from('communities')
-        .update({ member_count: selectedCommunity.member_count + inserts.length })
+        .update({ member_count: updatedMemberCount })
         .eq('id', selectedCommunity.id);
 
+      if (updateError.error) console.error('Error updating member count:', updateError.error);
+
+      // Get the names of added members for feedback
+      const addedMembers = selectedForAddition
+        .map(id => availableMembers.find(m => m.user_id === id)?.full_name)
+        .filter(Boolean)
+        .join(', ');
+
       toast({
-        title: 'Members Added',
-        description: `${inserts.length} member(s) added successfully`,
+        title: 'Members Added Successfully',
+        description: `Added ${inserts.length} member(s) to ${selectedCommunity.name}`,
       });
 
       setSelectedForAddition([]);
       fetchCommunityMembers(selectedCommunity.id);
+      setSelectedCommunity({ ...selectedCommunity, member_count: updatedMemberCount });
       fetchCommunities();
     } catch (error: any) {
+      console.error('Error adding members:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to add members',

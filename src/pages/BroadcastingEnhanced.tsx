@@ -106,6 +106,23 @@ export default function BroadcastingEnhanced() {
     fetchBroadcasts();
     fetchCampaigns();
     fetchMemberCounts();
+
+    // Subscribe to real-time broadcasts changes
+    const broadcastsSubscription = supabase
+      .channel('broadcasts_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'broadcasts' },
+        (payload) => {
+          console.log('Broadcasts changed:', payload.eventType);
+          fetchBroadcasts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      broadcastsSubscription.unsubscribe();
+    };
   }, []);
 
   const fetchMemberCounts = async () => {
@@ -796,16 +813,52 @@ export default function BroadcastingEnhanced() {
 
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-gray-900">Schedule (Optional)</h3>
-                <div className="space-y-2">
-                  <Label className="text-sm font-light">Scheduled Date & Time</Label>
-                  <Input
-                    type="datetime-local"
-                    value={formData.scheduled_for}
-                    onChange={(e) => setFormData({ ...formData, scheduled_for: e.target.value })}
-                  />
-                  <p className="text-xs text-gray-500 font-light">
-                    Leave empty to post immediately
-                  </p>
+                <div className="space-y-3">
+                  <Label className="text-sm font-light">Schedule for Later</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-light text-gray-600">Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.scheduled_for ? formData.scheduled_for.split('T')[0] : ''}
+                        onChange={(e) => {
+                          const date = e.target.value;
+                          const time = formData.scheduled_for ? formData.scheduled_for.split('T')[1] : '12:00';
+                          setFormData({ ...formData, scheduled_for: `${date}T${time}` });
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-light text-gray-600">Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.scheduled_for ? formData.scheduled_for.split('T')[1] : '12:00'}
+                        onChange={(e) => {
+                          const time = e.target.value;
+                          const date = formData.scheduled_for ? formData.scheduled_for.split('T')[0] : '';
+                          setFormData({ ...formData, scheduled_for: `${date}T${time}` });
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                  {formData.scheduled_for && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-900 font-light">
+                        Will be posted on {format(new Date(formData.scheduled_for), 'PPpp')}
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-600"
+                    onClick={() => setFormData({ ...formData, scheduled_for: '' })}
+                    disabled={!formData.scheduled_for}
+                  >
+                    Clear Schedule
+                  </Button>
                 </div>
               </div>
 

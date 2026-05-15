@@ -208,7 +208,7 @@ export default function Adverts() {
 
       const advertStatus = formData.start_date ? 'scheduled' : formData.status;
 
-      const { error } = await supabase.from('app_adverts').insert([{
+      const advertPayload = {
         title: formData.title,
         format: formData.format,
         content_type: formData.content_type,
@@ -224,9 +224,22 @@ export default function Adverts() {
         impressions: 0,
         clicks: 0,
         created_by: user.id,
-      }]);
+      };
 
-      if (error) throw error;
+      console.log('Creating advert with payload:', advertPayload);
+
+      const { error } = await supabase.from('app_adverts').insert([advertPayload]);
+
+      if (error) {
+        console.error('Advert creation error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          payload: advertPayload,
+        });
+        throw error;
+      }
 
       toast({
         title: 'Advert Created',
@@ -258,6 +271,7 @@ export default function Adverts() {
 
       fetchAdverts();
     } catch (error: any) {
+      console.error('Full error object:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to create advert',

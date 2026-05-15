@@ -70,6 +70,23 @@ export default function Polls() {
   useEffect(() => {
     fetchPolls();
     fetchCommunities();
+
+    // Subscribe to real-time poll responses changes for live vote updates
+    const pollResponsesSubscription = supabase
+      .channel('poll_responses_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'poll_responses' },
+        () => {
+          console.log('Poll votes updated, refreshing...');
+          fetchPolls();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      pollResponsesSubscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -85,7 +102,77 @@ export default function Polls() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPolls(data || []);
+
+      // Fetch poll options and responses to calculate votes
+      const pollIds = (data || []).map(p => p.id);
+      let optionsData: any = { data: [] };
+      let responsesData: any = { data: [] };
+
+      if (pollIds.length > 0) {
+        [optionsData, responsesData] = await Promise.all([
+          supabase
+            .from('poll_options')
+            .select('id, poll_id, option_text, option_order')
+            .in('poll_id', pollIds)
+            .order('option_order'),
+          supabase
+            .from('poll_responses')
+            .select('poll_id, option_id')
+            .in('poll_id', pollIds)
+        ]);
+      }
+
+      // Process polls with calculated vote counts
+      const processedPolls = (data || []).map(poll => {
+        // Get options for this poll
+        const pollOptions = (optionsData.data || []).filter(opt => opt.poll_id === poll.id);
+        
+        // Calculate votes for each option
+        const options: PollOption[] = pollOptions.map(option => {
+          const voteCount = (responsesData.data || []).filter(
+            r => r.option_id === option.id
+          ).length;
+          
+          return {
+            text: option.option_text,
+            votes: voteCount,
+          };
+        });
+
+        // Calculate total votes
+        const totalVotes = options.reduce((sum, opt) => sum + opt.votes, 0);
+        const totalParticipants = new Set(
+          (responsesData.data || [])
+            .filter(r => pollOptions.some(opt => opt.id === r.option_id))
+            .map(r => `${poll.id}_${r.poll_id}`) // Create unique key per poll response
+        ).size;
+
+        return {
+          ...poll,
+          options: options.length > 0 ? options : [{ text: '', votes: 0 }, { text: '', votes: 0 }],
+          total_votes: totalVotes,
+          total_participants: totalParticipants,
+        };
+      });
+
+      // Subscribe to real-time poll responses updates
+      const pollResponsesSubscription = supabase
+        .channel('poll_responses_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'poll_responses' },
+          () => {
+            console.log('Poll responses changed, refreshing...');
+            fetchPolls();
+          }
+        )
+        .subscribe();
+
+      setPolls(processedPolls);
+
+      return () => {
+        pollResponsesSubscription.unsubscribe();
+      };
     } catch (error) {
       console.error('Error fetching polls:', error);
     }

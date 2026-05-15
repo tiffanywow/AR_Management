@@ -253,11 +253,12 @@ export default function Members() {
     }
   };
 
-  const generateMembershipNumber = async (regionName: string) => {
-    const regionClass = regionClassifications.find(r => r.region_name === regionName);
+  const generateMembershipNumber = async (regionName: string, classificationsOverride?: RegionClassification[]) => {
+    const classificationsToUse = classificationsOverride || regionClassifications;
+    const regionClass = classificationsToUse.find(r => r.region_name === regionName);
 
     if (!regionClass) {
-      console.error('Region classification not found for:', regionName);
+      console.error('Region classification not found for:', regionName, 'Available:', classificationsToUse);
       throw new Error(`Region classification not found for ${regionName}`);
     }
 
@@ -316,17 +317,30 @@ export default function Members() {
         return;
       }
 
-      if (regionClassifications.length === 0) {
-        toast({
-          title: 'Error',
-          description: 'Region classifications not loaded yet. Please try again.',
-          variant: 'destructive',
-        });
-        setActionLoading(null);
-        return;
+      // Load region classifications if not already loaded
+      let classifications = regionClassifications;
+      if (classifications.length === 0) {
+        console.log('Region classifications not loaded, fetching now...');
+        const { data, error } = await supabase
+          .from('region_classifications')
+          .select('*')
+          .order('region_code', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching region classifications:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to load region data. Please try again.',
+            variant: 'destructive',
+          });
+          setActionLoading(null);
+          return;
+        }
+
+        classifications = data || [];
       }
 
-      const membershipNumber = await generateMembershipNumber(member.region);
+      const membershipNumber = await generateMembershipNumber(member.region, classifications);
 
       if (!membershipNumber || membershipNumber.trim() === '') {
         toast({
@@ -821,6 +835,19 @@ export default function Members() {
                         Download Card
                       </Button>
                     )}
+                    {member.status === 'rejected' && (
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => {
+                          handleApproveMember(member.id);
+                        }}
+                        disabled={actionLoading === member.id}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" strokeWidth={1.5} />
+                        {actionLoading === member.id ? 'Processing...' : 'Reapprove'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1029,10 +1056,27 @@ export default function Members() {
                 </div>
               )}
 
-              {selectedMember.status === 'rejected' && selectedMember.rejection_reason && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-red-900 mb-2">Rejection Reason</h4>
-                  <p className="text-sm text-red-800">{selectedMember.rejection_reason}</p>
+              {selectedMember.status === 'rejected' && (
+                <div className="space-y-4">
+                  {selectedMember.rejection_reason && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-red-900 mb-2">Rejection Reason</h4>
+                      <p className="text-sm text-red-800">{selectedMember.rejection_reason}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-end space-x-3 pt-4 border-t">
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={() => {
+                        handleApproveMember(selectedMember.id);
+                        setDetailDialogOpen(false);
+                      }}
+                      disabled={actionLoading === selectedMember.id}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      {actionLoading === selectedMember.id ? 'Processing...' : 'Reapprove Application'}
+                    </Button>
+                  </div>
                 </div>
               )}
 
